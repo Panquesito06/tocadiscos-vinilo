@@ -1,0 +1,29 @@
+{
+  "name": "tocadiscos-vinilo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reproductor de música en forma de tocadiscos 2.5D con una colección de vinilos totalmente editables.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "idb": "^8.0.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.20.5",
+    "fake-indexeddb": "^6.2.6",
+    "happy-dom": "^21.0.4",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5"
+  }
+}

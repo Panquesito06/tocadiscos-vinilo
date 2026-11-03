@@ -1,0 +1,88 @@
+/*
+  Tokens de diseño de la habitación.
+
+  La paleta sale del mundo real del vinilo y de una sala de escucha de los
+  años 70-80: nogal del aparador, aluminio cepillado del plato, fieltro del
+  tapete, papel kraft de las fundas interiores, el rojo EMI de la galleta de
+  referencia y un empapelado verde oscuro de pared. No se usan cremas claras
+  ni acentos genéricos: cada color tiene un material detrás.
+*/
+:root {
+  /* Materiales */
+  --nogal: #5a3a22;          /* madera del aparador y la estantería */
+  --nogal-oscuro: #3b2415;
+  --nogal-claro: #7b4f2e;
+  --fieltro: #2b2a2e;        /* tapete del plato, zonas neutras profundas */
+  --aluminio: #b8bcc0;       /* plato, brazo, tornillería */
+  --aluminio-oscuro: #7e8387;
+  --aluminio-claro: #e6e9eb;
+  --kraft: #c9a66b;          /* papel de fundas interiores, texto sobre carbón */
+  --kraft-claro: #e6d3a8;
+  --kraft-oscuro: #9c7a45;
+  --rojo-emi: #d1302a;       /* estados activos: botón start, pestaña activa, lomo seleccionado */
+  --rojo-emi-oscuro: #9b1f1b;
+  --tapiz: #3e5c58;          /* empapelado de la pared */
+  --tapiz-oscuro: #2c4340;
+  --tapiz-claro: #4f7470;
+  --tarima: #8b5e3c;         /* suelo de madera */
+  --tarima-oscuro: #5e3d25;
+  --carbon: #1c1b19;         /* paneles de interfaz (editor, ajustes) */
+  --carbon-claro: #2a2825;
+  --vinilo: #121212;         /* negro del disco */
+  --crema-galleta: #f1e6cf;  /* papel de una galleta clásica */
+
+  /* Roles de interfaz */
+  --fondo-ui: var(--carbon);
+  --fondo-ui-2: var(--carbon-claro);
+  --texto-ui: var(--kraft-claro);
+  --texto-ui-suave: var(--kraft);
+  --texto-ui-apagado: var(--kraft-oscuro);
+  --linea-ui: rgba(201, 166, 107, 0.22);
+  --acento: var(--rojo-emi);
+  --acento-texto: #fff4ec;
+  --foco: #ffd166;
+
+  /* Tipografía: una sola familia (Archivo variable) usada con contraste de
+     anchura: condensada para galletas y lomos, normal para la interfaz,
+     ancha y negra para los títulos. */
+  --fuente: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+  --tamano-xs: 0.72rem;
+  --tamano-s: 0.84rem;
+  --tamano-m: 1rem;
+  --tamano-l: 1.25rem;
+  --tamano-xl: 1.8rem;
+  --tamano-xxl: 2.6rem;
+  --interlineado: 1.45;
+
+  /* Espaciado y formas */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+  --esp-7: 48px;
+  --radio-s: 3px;
+  --radio-m: 6px;
+  --radio-l: 14px;
+
+  /* Sombras: luz cálida que entra desde arriba a la izquierda */
+  --sombra-objeto: 0 10px 24px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.35);
+  --sombra-suave: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --luz-x: -0.35;
+  --luz-y: -0.8;
+
+  /* Movimiento */
+  --dur-rapida: 120ms;
+  --dur-media: 260ms;
+  --dur-lenta: 600ms;
+  --curva: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-rapida: 0ms;
+    --dur-media: 0ms;
+    --dur-lenta: 0ms;
+  }
+}
