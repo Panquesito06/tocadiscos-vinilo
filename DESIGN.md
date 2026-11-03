@@ -161,6 +161,25 @@ hueco de `trackGapSec` visible como banda más ancha.
 
 - `npm run typecheck`, `npm test` (Vitest + happy-dom + fake-indexeddb),
   `npm run build`.
+- Ganchos estables para pruebas (`data-test`), obligatorios en las vistas:
+  - Habitación: `data-test="habitacion"`, `anadir-vinilo`, `ajustes`, `aviso`.
+  - Estantería: cada lomo es `button[data-test="lomo"][data-vinyl-id]`;
+    hueco: `data-test="hueco"`; caja: `data-test="caja"`.
+  - Mano: `data-test="mano"`, botones `mano-girar`, `mano-abrir`,
+    `mano-sacar-funda`, `mano-sacar-disco`, `mano-voltear`, `mano-limpiar`,
+    `mano-poner-a`, `mano-poner-b`, `mano-editar`, `mano-guardar`; el disco
+    visible: `mano-disco`.
+  - Tocadiscos: `data-test="tt"`, `tt-disco` (contenedor que gira),
+    `tt-cabezal` (asa de arrastre del brazo), `tt-brazo`, `tt-cue`, `tt-start`,
+    `tt-33`, `tt-45`, `tt-78`, `tt-pitch`, `tt-volumen`, `tt-encendido`,
+    `tt-tapa`, `tt-centrador`, `tt-quitar`, `tt-voltear`, `tt-cepillo`,
+    `tt-pantalla`.
+  - Editor: `data-test="editor"`, `editor-cerrar`, `editor-eliminar`,
+    `editor-preset-normal|ring|full`, pestañas `editor-tab-<EditorTab>`,
+    campos de cabecera `editor-artista`, `editor-titulo`; en Canciones,
+    `editor-importar` (input file).
+- Para e2e, `app.ts` expone `window.__tocadiscos` con
+  `{ audioState(): string | null; positionSec(): number; state(): AppState }`.
 - `npm run test:e2e` (Playwright con el Chromium preinstalado) recorre el
   flujo completo: arranca, siembra la demo, saca un disco, lo pone en el
   plato, baja la aguja, arranca el motor, comprueba que el AudioContext
