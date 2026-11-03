@@ -2,20 +2,24 @@
  * Dibujo de la carpeta (portada, contraportada, interior desplegable) y del lomo.
  *
  * CONTRATO (lo implementa el módulo de render de embalaje):
+ *  - Todos los tamaños son píxeles DE DISPOSITIVO. El canvas de la carpeta
+ *    es cuadrado de `sizePx` y representa `jacketSizeMm(format)` mm de lado
+ *    (315 / 260 / 180): la escala es `sizePx / jacketSizeMm(format)` px/mm.
  *  - Portada: `front` (color, degradado o imagen) más, si
  *    `showTitleOnFront`, artista y título con `titleStyle`. Acabado:
  *    `gloss` añade un reflejo diagonal suave; `textured` un grano fino.
- *    `cutCorner` recorta una esquina; `sticker` dibuja una pegatina redonda.
+ *    `cutCorner` recorta una esquina; `sticker` dibuja una pegatina redonda
+ *    con su texto y color.
  *  - Contraportada: `back` más lista de canciones por caras (con duraciones
- *    m:ss) si `showTracklistOnBack`, `backNotes`, sello, número de catálogo
- *    y año en pequeño.
+ *    m:ss) si `showTracklistOnBack`, `backNotes` con `backStyle`, sello,
+ *    número de catálogo y año en pequeño.
  *  - Interior desplegable: canvas de doble anchura con `insideLeft` e
  *    `insideRight` (si son null, el color de la contraportada).
  *  - Lomo: canvas vertical `widthPx × heightPx` con el texto girado 90°
  *    (de abajo arriba, como en una estantería), fondo `background`, franja
  *    `accentColor` en un extremo y número de catálogo en el otro si procede.
- *  - El canvas de la carpeta es cuadrado de `sizePx` (la carpeta mide
- *    ~2 mm más que el disco por lado, pero se dibuja al mismo tamaño).
+ *  - Si `getContext('2d')` devuelve null (tests), devuelve el canvas del
+ *    tamaño pedido sin lanzar.
  */
 import type { Vinyl } from '../core/types';
 import type { ImageCache } from './images';

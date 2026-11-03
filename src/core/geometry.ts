@@ -61,6 +61,22 @@ export function discGeometry(format: Format): DiscGeometry {
   return GEOMETRY[format];
 }
 
+/** Anchura máxima del aro decorado: el dead wax disponible entre la galleta y el surco interior. */
+export function maxRingWidthMm(format: Format): number {
+  const g = GEOMETRY[format];
+  return g.innerGrooveMm - g.labelRadiusMm;
+}
+
+/** Lado de la carpeta (y de las fundas) en mm según el formato. */
+export function jacketSizeMm(format: Format): number {
+  return format === '12' ? 315 : format === '10' ? 260 : 180;
+}
+
+/** Segundos de silencio con crepitar que dura el surco de entrada (lead-in). */
+export const LEAD_IN_SEC = 2;
+/** Segundos de silencio que dura el surco de salida (lead-out) antes del surco de bloqueo. */
+export const LEAD_OUT_SEC = 4;
+
 /** Diámetro del agujero central en mm. */
 export function holeDiameterMm(hole: HoleSize): number {
   return hole === 'large' ? 38.1 : 7.24;
@@ -104,6 +120,39 @@ export function timeForRadius(geo: DiscGeometry, durationSec: number, radiusMm: 
   if (durationSec <= 0 || outer === inner) return 0;
   const f = (outer - radiusMm) / (outer - inner);
   return Math.min(durationSec, Math.max(0, f * durationSec));
+}
+
+/**
+ * Como `radiusForTime`, pero con la línea de tiempo extendida que usa el
+ * motor de audio: `t` en [−LEAD_IN_SEC, 0) recorre el surco de entrada y
+ * `t` en (duración, duración + LEAD_OUT_SEC] recorre el surco de salida
+ * hasta `innerGrooveMm`. Fuera de ese rango se acota.
+ */
+export function radiusForTimeExt(geo: DiscGeometry, durationSec: number, t: number): number {
+  const { outer, inner } = programSpanMm(geo);
+  if (t < 0) {
+    const f = Math.min(1, Math.max(0, -t / LEAD_IN_SEC));
+    return outer + geo.leadInMm * f;
+  }
+  if (t > durationSec) {
+    const f = Math.min(1, Math.max(0, (t - durationSec) / LEAD_OUT_SEC));
+    return inner - geo.leadOutMm * f;
+  }
+  return radiusForTime(geo, durationSec, t);
+}
+
+/** Inverso de `radiusForTimeExt`: negativo en el lead-in, mayor que la duración en el lead-out. */
+export function timeForRadiusExt(geo: DiscGeometry, durationSec: number, radiusMm: number): number {
+  const { outer, inner } = programSpanMm(geo);
+  if (radiusMm > outer) {
+    const f = Math.min(1, Math.max(0, (radiusMm - outer) / geo.leadInMm));
+    return -LEAD_IN_SEC * f;
+  }
+  if (radiusMm < inner) {
+    const f = Math.min(1, Math.max(0, (inner - radiusMm) / geo.leadOutMm));
+    return durationSec + LEAD_OUT_SEC * f;
+  }
+  return timeForRadius(geo, durationSec, radiusMm);
 }
 
 export type GrooveZone = 'off' | 'lead-in' | 'program' | 'lead-out' | 'dead-wax' | 'label';

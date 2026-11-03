@@ -2,32 +2,60 @@
  * Motor de audio del tocadiscos (Web Audio + AudioWorklet).
  *
  * CONTRATO (lo implementa el módulo de audio):
- *  - `init()` crea el AudioContext y carga los worklets de
- *    `public/worklets/`. Debe llamarse tras un gesto del usuario; si el
- *    contexto queda suspendido, `init()` lo reanuda.
+ *  - `init()` es idempotente (llamadas repetidas comparten la misma
+ *    promesa o reanudan el contexto si quedó suspendido). Debe invocarse
+ *    dentro de un gesto del usuario (pointerup / keydown): crea el
+ *    AudioContext con `{ sampleRate: AUDIO_SAMPLE_RATE }` y llama a
+ *    `resume()` DE FORMA SÍNCRONA en la misma pila del gesto, y solo
+ *    después hace `await` de `audioWorklet.addModule(workletUrl(nombre))`,
+ *    donde `workletUrl(n) = new URL(`${BASE_URL}worklets/${n}.js`, document.baseURI).href`
+ *    (BASE_URL = `import.meta.env.BASE_URL`, con '/' final garantizada;
+ *    nunca una ruta absoluta `/worklets/...`, porque la build usa
+ *    `base: './'`). Escucha
+ *    `statechange` y vuelve a reanudar cuando el contexto se interrumpe.
+ *    `ready` es true cuando el contexto está `running` y los worklets
+ *    cargados. Si `context.audioWorklet` no existe (contexto no seguro:
+ *    http en la red local), rechaza con un Error en español que diga qué
+ *    pasó y qué hacer ("El sonido necesita https o localhost").
  *  - `loadSide()` recibe la descripción de una cara: cada pista trae su
  *    duración y una función `load()` que decodifica bajo demanda (las pistas
  *    se cargan en el worklet solo cuando la aguja se acerca, como ventana
  *    actual ± 1, para no tener en memoria una cara entera descodificada).
- *    El motor construye una línea de tiempo continua: pista, silencio de
- *    `gapSec`, pista… Las pistas cuya `load()` devuelve null suenan como
- *    silencio (solo ruido de superficie).
+ *    La línea de tiempo es: pista, silencio de `gapSec`, pista…; la longitud
+ *    de cada hueco de pista es EXACTAMENTE `durationSec` (la misma que usa
+ *    core/geometry): si el audio decodificado es más largo se trunca, si es
+ *    más corto el resto es silencio. `getDurationSec()` coincide con
+ *    `sideDurationSec(side, gap)`. Las pistas cuya `load()` devuelve null
+ *    suenan como silencio (solo ruido de superficie).
+ *  - La posición se acota a [−LEAD_IN_SEC, duración + LEAD_OUT_SEC]
+ *    (constantes de core/geometry): la parte negativa es el surco de
+ *    entrada y la final el surco de salida, ambos silencio con efectos.
+ *    Hacia atrás se detiene en el mínimo y hacia delante en el máximo (el
+ *    disco sigue girando, el programa no avanza). `onEnd()` se emite una
+ *    vez cada vez que la posición cruza la duración hacia delante; volver
+ *    por debajo de la duración vuelve a armarlo.
  *  - `setRate()` fija el multiplicador de velocidad respecto a la nominal:
- *    1 = velocidad nominal, 0 = parado, negativo = hacia atrás (scratch).
- *    El worklet lee las muestras con interpolación lineal a esa velocidad,
- *    de modo que el tono cambia con la velocidad, como en un tocadiscos real.
+ *    1 = nominal, 0 = parado, negativo = hacia atrás (scratch). Es un
+ *    AudioParam a-rate del worklet; `setRate(v)` usa
+ *    `setTargetAtTime(v, currentTime, 0.02)` para evitar escalones de tono.
+ *    El worklet lee con interpolación lineal y avanza por muestra
+ *    `rate × (pista.sampleRate / context.sampleRate) × (1 + wobbleDepth·sin(2π·wobbleHz·t))`.
  *    El motor NO aplica el pitch ni el selector por su cuenta: la aplicación
  *    ya le pasa rpmReal / rpmNominalDelDisco.
+ *  - Posición: el worklet envía `{sec, contextTime, seq}` ~20 veces por
+ *    segundo; `seekSec()` incrementa `seq` y los mensajes con `seq` anterior
+ *    se ignoran; `getPositionSec()` devuelve la última posición extrapolada
+ *    con el rate actual y acotada.
  *  - `setStylus(true)` apoya la aguja: suena el programa más los efectos
  *    (crepitar, siseo, clics, bamboleo). Al apoyar/levantar se oye un golpe
  *    sordo breve. Con la aguja levantada no suena nada salvo el zumbido del
  *    motor si está en marcha (muy bajo). La posición sigue avanzando con la
  *    aguja levantada (el disco gira igualmente).
- *  - `onPosition()` recibe la posición (s) ~20 veces por segundo.
- *  - `onEnd()` se dispara una vez por carga cuando la posición alcanza la
- *    duración total.
  */
 import type { EngineEffects } from '../core/physics';
+
+/** Frecuencia de muestreo del contexto y de toda la decodificación. */
+export const AUDIO_SAMPLE_RATE = 48000;
 
 /** Pista decodificada: PCM entero de 16 bits por canal (ahorra la mitad de memoria frente a Float32). */
 export interface DecodedTrack {

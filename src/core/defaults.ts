@@ -53,7 +53,7 @@ export function defaultCondition(): Condition {
 }
 
 export function defaultRing(overrides: Partial<RingSpec> = {}): RingSpec {
-  return { pattern: 'stripes', color1: '#d1302a', color2: '#f1e6cf', widthMm: 10, image: null, ...overrides };
+  return { pattern: 'stripes', color1: '#d1302a', color2: '#f1e6cf', widthMm: 8, image: null, ...overrides };
 }
 
 export function defaultRim(overrides: Partial<RimSpec> = {}): RimSpec {
@@ -240,7 +240,7 @@ export function presetRing(meta: Partial<VinylMeta> = {}, tracksA: Track[] = [],
   v.disc.thicknessMm = defaultThicknessMm(180);
   for (const side of v.disc.sides) {
     side.decoration = 'ring';
-    side.ring = defaultRing({ pattern: 'rivets', color1: '#2d2d2a', color2: '#b8bcc0', widthMm: 12 });
+    side.ring = defaultRing({ pattern: 'rivets', color1: '#2d2d2a', color2: '#b8bcc0', widthMm: 10 });
     side.label.background = solid('#f1e6cf');
   }
   v.disc.sides[0].tracks = tracksA;
@@ -271,6 +271,104 @@ export function presetFull(meta: Partial<VinylMeta> = {}, tracksA: Track[] = [])
   b.groovesOverArt = false;
   b.tracks = [];
   return v;
+}
+
+/**
+ * Marca un vinilo como modificado con un `updatedAt` estrictamente creciente
+ * (dos ediciones en el mismo milisegundo no deben compartir clave de caché).
+ */
+export function touch(vinyl: Vinyl, now = Date.now()): void {
+  vinyl.updatedAt = Math.max(now, vinyl.updatedAt + 1);
+}
+
+/**
+ * Propaga un cambio de datos generales a la galleta de ambas caras, al lomo
+ * y al título de portada, SOLO en los campos que todavía coincidían con el
+ * valor derivado del meta anterior (es decir, que el usuario no personalizó).
+ */
+export function syncDerivedTexts(vinyl: Vinyl, prevMeta: VinylMeta): void {
+  const meta = vinyl.meta;
+  for (const side of vinyl.disc.sides) {
+    const f = side.label.fields;
+    if (f.artist === prevMeta.artist) f.artist = meta.artist;
+    if (f.title === prevMeta.title) f.title = meta.title;
+    if (f.brand === prevMeta.labelName) f.brand = meta.labelName;
+    if (f.catalogNumber === prevMeta.catalogNumber) f.catalogNumber = meta.catalogNumber;
+    if (f.year === prevMeta.year) f.year = meta.year;
+  }
+  if (vinyl.spine.text === spineTextFor(prevMeta)) vinyl.spine.text = spineTextFor(meta);
+}
+
+export type PresetKind = 'normal' | 'ring' | 'full';
+
+/**
+ * Aplica solo la DECORACIÓN de un preset a un vinilo existente: material y
+ * colores del disco y, por cara, `decoration`, `ring`, `artwork`, `rim`,
+ * `groovesOverArt` y el fondo de la galleta. Conserva pistas, campos de la
+ * galleta, metadatos, carpeta, fundas y lomo. En `full`, la cara B pasa a
+ * decorativa solo si no tiene pistas.
+ */
+export function applyPresetDecoration(vinyl: Vinyl, kind: PresetKind): void {
+  const sample = kind === 'normal' ? presetNormal() : kind === 'ring' ? presetRing() : presetFull();
+  vinyl.disc.material = sample.disc.material;
+  vinyl.disc.color = sample.disc.color;
+  vinyl.disc.color2 = sample.disc.color2;
+  vinyl.disc.sides.forEach((side, i) => {
+    const src = sample.disc.sides[i === 0 ? 0 : 1];
+    side.decoration = src.decoration;
+    side.ring = { ...src.ring };
+    side.artwork = src.artwork ? { ...src.artwork } : null;
+    side.rim = { ...src.rim };
+    side.groovesOverArt = src.groovesOverArt;
+    side.label.background = { ...src.label.background };
+    if (kind === 'full' && i === 1) side.decorative = side.tracks.length === 0;
+    else if (kind !== 'full') side.decorative = false;
+  });
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Mezcla un valor guardado sobre su valor por defecto: rellena los campos
+ * que falten (versiones anteriores del esquema) sin tocar los presentes.
+ * Los objetos con `kind` (rellenos) y los arrays se toman tal cual.
+ */
+export function mergeWithDefaults<T>(def: T, val: unknown): T {
+  if (val === undefined) return def;
+  if (val === null) return null as T;
+  if (Array.isArray(def)) return (Array.isArray(val) ? val : def) as T;
+  if (isPlainObject(def)) {
+    if (!isPlainObject(val)) return def;
+    if ('kind' in val) return val as T;
+    const out: Record<string, unknown> = { ...def };
+    for (const key of Object.keys(def)) out[key] = mergeWithDefaults(def[key], val[key]);
+    return out as T;
+  }
+  return (typeof val === typeof def ? val : def) as T;
+}
+
+/** Normaliza un vinilo leído del almacén: rellena con valores por defecto lo que falte. */
+export function normalizeVinyl(raw: unknown): Vinyl {
+  const r = isPlainObject(raw) ? raw : {};
+  const rawMeta = isPlainObject(r.meta) ? r.meta : {};
+  const meta = mergeWithDefaults(defaultMeta(), rawMeta);
+  const base = createVinyl({ meta, now: typeof r.createdAt === 'number' ? r.createdAt : Date.now() });
+  const merged = mergeWithDefaults(base, { ...r, disc: undefined, meta });
+  const rawDisc = isPlainObject(r.disc) ? r.disc : {};
+  const rawSides = Array.isArray(rawDisc.sides) ? rawDisc.sides : [];
+  const disc = mergeWithDefaults(defaultDisc(meta), { ...rawDisc, sides: undefined });
+  disc.sides = [
+    mergeWithDefaults(defaultSide('A', meta), rawSides[0]),
+    mergeWithDefaults(defaultSide('B', meta), rawSides[1]),
+  ];
+  for (const side of disc.sides) {
+    side.tracks = side.tracks.map((t) => mergeWithDefaults(track('', 0), t));
+  }
+  merged.disc = disc;
+  if (typeof r.id === 'string' && r.id) merged.id = r.id;
+  return merged;
 }
 
 export function defaultTurntableState(): TurntableState {

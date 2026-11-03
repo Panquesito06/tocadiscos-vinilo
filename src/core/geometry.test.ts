@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { createVinyl, track } from './defaults';
 import {
+  LEAD_IN_SEC,
+  LEAD_OUT_SEC,
   discGeometry,
   grooveDensity,
   holeDiameterMm,
+  jacketSizeMm,
   radiusForTime,
+  radiusForTimeExt,
   sideDurationSec,
   timeForRadius,
+  timeForRadiusExt,
   trackBands,
   trackIndexAtTime,
   zoneForRadius,
@@ -38,6 +43,22 @@ describe('geometría del disco', () => {
     expect(timeForRadius(g, dur, rMid)).toBeCloseTo(600, 6);
     expect(timeForRadius(g, dur, r0 + 50)).toBe(0);
     expect(timeForRadius(g, dur, 0)).toBe(dur);
+  });
+
+  it('la línea de tiempo extendida recorre lead-in y lead-out', () => {
+    const g = discGeometry('12');
+    const dur = 600;
+    const outerProgram = radiusForTime(g, dur, 0);
+    const innerProgram = radiusForTime(g, dur, dur);
+    expect(radiusForTimeExt(g, dur, -LEAD_IN_SEC)).toBeCloseTo(g.outerGrooveMm, 6);
+    expect(radiusForTimeExt(g, dur, -LEAD_IN_SEC / 2)).toBeCloseTo(outerProgram + g.leadInMm / 2, 6);
+    expect(radiusForTimeExt(g, dur, dur + LEAD_OUT_SEC)).toBeCloseTo(g.innerGrooveMm, 6);
+    expect(radiusForTimeExt(g, dur, dur + 99)).toBeCloseTo(g.innerGrooveMm, 6);
+    expect(timeForRadiusExt(g, dur, g.outerGrooveMm)).toBeCloseTo(-LEAD_IN_SEC, 6);
+    expect(timeForRadiusExt(g, dur, g.innerGrooveMm)).toBeCloseTo(dur + LEAD_OUT_SEC, 6);
+    expect(timeForRadiusExt(g, dur, (outerProgram + innerProgram) / 2)).toBeCloseTo(dur / 2, 6);
+    expect(timeForRadiusExt(g, dur, radiusForTimeExt(g, dur, -0.7))).toBeCloseTo(-0.7, 6);
+    expect(jacketSizeMm('7')).toBe(180);
   });
 
   it('clasifica las zonas de fuera adentro', () => {

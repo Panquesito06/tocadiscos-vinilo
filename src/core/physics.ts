@@ -84,7 +84,8 @@ export function wobbleAmount(disc: Disc, turntable: TurntableState): number {
 export function effectsFor(disc: Disc, turntable: TurntableState, actualRpm: number): EngineEffects {
   const c = disc.condition;
   const quality = clamp01(disc.pressingQuality * 0.7 + disc.grooveDepth * 0.3);
-  const speedFactor = Math.max(0, actualRpm) / rpmValue(disc.nativeRpm);
+  // La aguja roza igual en ambos sentidos (scratch hacia atrás también crepita).
+  const speedFactor = Math.abs(actualRpm) / rpmValue(disc.nativeRpm);
   const wobble = wobbleAmount(disc, turntable);
   return {
     crackleRate: (2 + 60 * c.dust) * speedFactor,
@@ -92,7 +93,7 @@ export function effectsFor(disc: Disc, turntable: TurntableState, actualRpm: num
     hissGain: clamp01(0.03 + 0.35 * (1 - quality) + 0.5 * c.wear),
     rumbleGain: turntable.motor ? 0.25 : 0,
     wobbleDepth: 0.08 * wobble,
-    wobbleHz: Math.max(0, actualRpm) / 60,
+    wobbleHz: Math.abs(actualRpm) / 60,
     clickRate: 8 * c.scratches * speedFactor,
     clickGain: clamp01(0.2 + 0.8 * c.scratches),
   };

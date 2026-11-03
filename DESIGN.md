@@ -124,9 +124,16 @@ una exportación nueva sin romper las existentes.
 | app | `src/app/*`, `e2e/*` | todo |
 
 `src/core/types.ts`, `geometry.ts`, `physics.ts`, `platter.ts`,
-`defaults.ts`, `events.ts`, `ids.ts`, `render/images.ts` y `render/index.ts`
-son compartidos y ya están implementados: se leen, no se editan (salvo
-corrección de un error demostrable, que se comunica).
+`defaults.ts`, `blobs.ts`, `events.ts`, `ids.ts`, `render/images.ts` y
+`render/index.ts` son compartidos y ya están implementados: se leen, no se
+editan (salvo corrección de un error demostrable, que se comunica).
+
+Utilidades compartidas que los módulos deben usar en vez de reinventar:
+`touch(vinyl)` (updatedAt monótono), `syncDerivedTexts`, `applyPresetDecoration`,
+`normalizeVinyl` / `mergeWithDefaults`, `collectBlobKeys` / `orphanBlobKeys` /
+`isBlobKeyInUse`, `blit(target, source)` (copiar un canvas compartido),
+`maxRingWidthMm`, `jacketSizeMm`, `radiusForTimeExt` / `timeForRadiusExt`,
+`LEAD_IN_SEC` / `LEAD_OUT_SEC`, `AUDIO_SAMPLE_RATE`.
 
 ## 4. Modelo físico (resumen de `core/physics.ts` y `core/platter.ts`)
 
@@ -184,7 +191,10 @@ hueco de `trackGapSec` visible como banda más ancha.
   flujo completo: arranca, siembra la demo, saca un disco, lo pone en el
   plato, baja la aguja, arranca el motor, comprueba que el AudioContext
   está `running` y que no hay errores de consola; abre el editor y cambia
-  el título; recarga y comprueba que persiste.
+  el título general; recarga y comprueba que el lomo muestra el nuevo
+  título.
+- El sonido necesita un contexto seguro (https o localhost): abrir la app
+  por http desde otra máquina de la red local muestra un aviso y no suena.
 
 ## 7. Fuera de la v1 (dicho explícitamente)
 

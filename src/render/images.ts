@@ -4,7 +4,9 @@
  * dibujar en canvas de forma síncrona.
  */
 import type { BlobStore } from '../core/store';
-import type { Fill, ImageRef, Vinyl } from '../core/types';
+import type { ImageRef } from '../core/types';
+
+export { collectImageRefs } from '../core/blobs';
 
 export class ImageCache {
   private images = new Map<string, HTMLImageElement>();
@@ -69,25 +71,4 @@ export class ImageCache {
       this.pending.delete(blobKey);
     }
   }
-}
-
-function refOfFill(fill: Fill | null | undefined): ImageRef | null {
-  return fill && fill.kind === 'image' ? fill.image : null;
-}
-
-/** Todas las referencias de imagen que usa un vinilo. */
-export function collectImageRefs(vinyl: Vinyl): ImageRef[] {
-  const refs: (ImageRef | null | undefined)[] = [];
-  for (const side of vinyl.disc.sides) {
-    refs.push(refOfFill(side.label.background), side.label.image, side.ring.image, refOfFill(side.artwork));
-  }
-  refs.push(refOfFill(vinyl.innerSleeve.printFront), refOfFill(vinyl.innerSleeve.printBack));
-  refs.push(
-    refOfFill(vinyl.jacket.front),
-    refOfFill(vinyl.jacket.back),
-    refOfFill(vinyl.jacket.insideLeft),
-    refOfFill(vinyl.jacket.insideRight),
-  );
-  refs.push(refOfFill(vinyl.outerSleeve.print));
-  return refs.filter((r): r is ImageRef => !!r);
 }

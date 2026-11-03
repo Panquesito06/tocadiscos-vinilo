@@ -8,6 +8,13 @@
  * Las medidas se expresan en milímetros y los tiempos en segundos.
  */
 
+/**
+ * Versión del documento persistido. Se incrementa cuando cambia la forma de
+ * `Vinyl`, `TurntableState` o `Settings`; el store aplica migraciones y
+ * normaliza con los valores por defecto al cargar.
+ */
+export const SCHEMA_VERSION = 1;
+
 // ---------------------------------------------------------------------------
 // Primitivas
 // ---------------------------------------------------------------------------
@@ -136,7 +143,7 @@ export interface Side {
   tracks: Track[];
   label: LabelSpec;
   ring: RingSpec;
-  /** Obra a cara completa (solo `decoration === 'full'` o cara decorativa). */
+  /** Obra a cara completa. Solo se dibuja con `decoration === 'full'`. */
   artwork: Fill | null;
   rim: RimSpec;
   /** Con obra a cara completa, dibujar los surcos tenues encima (picture disc). */
