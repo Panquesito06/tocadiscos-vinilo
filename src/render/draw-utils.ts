@@ -267,14 +267,22 @@ export function paintFill(ctx: CanvasRenderingContext2D, fill: Fill, box: Rect, 
 export const FONT_FAMILY = "'Archivo Variable', 'Archivo', system-ui, sans-serif";
 
 /** Palabra clave de `font-stretch` por anchura. */
-const STRETCH_KEYWORD: Record<FontWidth, string> = { condensed: 'condensed', normal: 'normal', expanded: 'expanded' };
+const STRETCH_KEYWORD: Record<FontWidth, CanvasFontStretch> = {
+  condensed: 'condensed',
+  normal: 'normal',
+  expanded: 'expanded',
+};
 
 /** Escala horizontal que emula cada anchura cuando la fuente no tiene eje de anchura. */
 export const WIDTH_SCALE: Record<FontWidth, number> = { condensed: 0.8, normal: 1, expanded: 1.2 };
 
 const PROBE_TEXT = 'MMMMMMMMMM';
 
-type StretchContext = CanvasRenderingContext2D & { fontStretch?: string };
+/** `fontStretch` está tipado en lib.dom pero no existe en todos los navegadores: se comprueba en tiempo de ejecución. */
+type StretchContext = CanvasRenderingContext2D & { fontStretch?: CanvasFontStretch };
+
+/** Resultado del sondeo de anchura nativa por contexto (la fuente no cambia durante un dibujo). */
+const stretchProbeCache = new WeakMap<CanvasRenderingContext2D, Map<FontWidth, boolean>>();
 
 export function fontString(weight: number, sizePx: number): string {
   const w = Math.round(clamp(weight, 100, 900));
@@ -286,23 +294,37 @@ export function textCase(text: string, style: Pick<TextStyle, 'uppercase'>): str
   return style.uppercase ? text.toLocaleUpperCase('es') : text;
 }
 
-/**
- * Intenta la anchura nativa. Devuelve true solo si el contexto admite
- * `fontStretch` Y la fuente responde (una fuente sin eje `wdth` mide igual).
- */
-function applyNativeStretch(ctx: StretchContext, width: FontWidth): boolean {
-  if (typeof ctx.fontStretch !== 'string') return false;
-  if (width === 'normal') {
-    ctx.fontStretch = 'normal';
-    return true;
+/** ¿Responde la fuente actual a `fontStretch`? (Una fuente sin eje `wdth` mide igual con cualquier anchura.) */
+function fontRespondsToStretch(ctx: StretchContext, width: FontWidth): boolean {
+  let perWidth = stretchProbeCache.get(ctx);
+  if (!perWidth) {
+    perWidth = new Map();
+    stretchProbeCache.set(ctx, perWidth);
   }
+  const known = perWidth.get(width);
+  if (known !== undefined) return known;
   ctx.fontStretch = 'normal';
   const base = ctx.measureText(PROBE_TEXT).width;
   ctx.fontStretch = STRETCH_KEYWORD[width];
   const stretched = ctx.measureText(PROBE_TEXT).width;
-  if (Math.abs(stretched - base) > base * 0.01) return true;
-  ctx.fontStretch = 'normal';
-  return false;
+  const responds = Math.abs(stretched - base) > base * 0.01;
+  perWidth.set(width, responds);
+  return responds;
+}
+
+/**
+ * Intenta la anchura nativa. Devuelve true solo si el contexto admite
+ * `fontStretch` Y la fuente responde; si no, deja la anchura normal para
+ * que el llamador la emule con una escala horizontal.
+ */
+function applyNativeStretch(ctx: StretchContext, width: FontWidth): boolean {
+  if (typeof ctx.fontStretch !== 'string') return false;
+  if (width === 'normal' || !fontRespondsToStretch(ctx, width)) {
+    ctx.fontStretch = 'normal';
+    return width === 'normal';
+  }
+  ctx.fontStretch = STRETCH_KEYWORD[width];
+  return true;
 }
 
 /**
