@@ -184,7 +184,7 @@ function parseFunctional(fn: string, body: string): Rgba | null {
   const channel = (token: string): number | null => {
     if (token.endsWith('%')) {
       const n = parseNumber(token, '%');
-      return n === null ? null : clamp(Math.round(n * 2.55), 0, 255);
+      return n === null ? null : clamp(Math.round((n * 255) / 100), 0, 255);
     }
     const n = parseNumber(token, '');
     return n === null ? null : clamp(Math.round(n), 0, 255);
