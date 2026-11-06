@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Format, TurntableState } from '../core/types';
 import {
   DEFAULT_PX_PER_MM,
@@ -18,22 +18,24 @@ import { ORBIT_RADIUS_MM, REST_RADIUS_MM, stylusPointForRadius } from './turntab
 // Utilidades
 // ---------------------------------------------------------------------------
 
-function makeActions(): { [K in keyof TurntableActions]: ReturnType<typeof vi.fn> } & TurntableActions {
+type MockActions = { [K in keyof TurntableActions]: Mock<TurntableActions[K]> };
+
+function makeActions(): MockActions {
   return {
-    toggleMotor: vi.fn(),
-    setSpeed: vi.fn(),
-    setPitch: vi.fn(),
-    setVolume: vi.fn(),
-    toggleLid: vi.fn(),
-    toggleAdapter: vi.fn(),
-    setCue: vi.fn(),
-    moveTonearm: vi.fn(),
-    handPlatter: vi.fn(),
-    brushStroke: vi.fn(),
-    removeDisc: vi.fn(),
-    flipDisc: vi.fn(),
-    setTool: vi.fn(),
-    powerToggle: vi.fn(),
+    toggleMotor: vi.fn<TurntableActions['toggleMotor']>(),
+    setSpeed: vi.fn<TurntableActions['setSpeed']>(),
+    setPitch: vi.fn<TurntableActions['setPitch']>(),
+    setVolume: vi.fn<TurntableActions['setVolume']>(),
+    toggleLid: vi.fn<TurntableActions['toggleLid']>(),
+    toggleAdapter: vi.fn<TurntableActions['toggleAdapter']>(),
+    setCue: vi.fn<TurntableActions['setCue']>(),
+    moveTonearm: vi.fn<TurntableActions['moveTonearm']>(),
+    handPlatter: vi.fn<TurntableActions['handPlatter']>(),
+    brushStroke: vi.fn<TurntableActions['brushStroke']>(),
+    removeDisc: vi.fn<TurntableActions['removeDisc']>(),
+    flipDisc: vi.fn<TurntableActions['flipDisc']>(),
+    setTool: vi.fn<TurntableActions['setTool']>(),
+    powerToggle: vi.fn<TurntableActions['powerToggle']>(),
   };
 }
 
@@ -679,10 +681,10 @@ describe('escala', () => {
   });
 
   it('onResize avisa cuando ResizeObserver mide otra anchura', () => {
-    let measureCb: (() => void) | null = null;
+    const observed: { measure: () => void } = { measure: () => undefined };
     class FakeResizeObserver {
       constructor(cb: () => void) {
-        measureCb = cb;
+        observed.measure = cb;
       }
       observe(): void {}
       unobserve(): void {}
@@ -694,7 +696,7 @@ describe('escala', () => {
     const off = view.onResize(listener);
     Object.defineProperty(view.el, 'clientWidth', { configurable: true, value: 900 });
     Object.defineProperty(view.el, 'clientHeight', { configurable: true, value: 788 });
-    measureCb?.();
+    observed.measure();
     expect(listener).toHaveBeenCalledTimes(1);
     expect(view.el.style.getPropertyValue('--tt-escala')).toBe((900 / STAGE_MM.width).toFixed(5));
     expect(view.discSizePx('12')).toBe(Math.round(302 * 2 * (window.devicePixelRatio || 1)));
@@ -702,7 +704,7 @@ describe('escala', () => {
     off();
     Object.defineProperty(view.el, 'clientWidth', { configurable: true, value: 450 });
     Object.defineProperty(view.el, 'clientHeight', { configurable: true, value: 394 });
-    measureCb?.();
+    observed.measure();
     expect(listener).toHaveBeenCalledTimes(1);
     expect(view.discSizePx('12')).toBe(Math.round(302 * (window.devicePixelRatio || 1)));
   });
