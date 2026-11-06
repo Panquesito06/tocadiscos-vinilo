@@ -30,36 +30,29 @@ function stateWith(vinyls: Vinyl[], ui: Partial<AppState['ui']> = {}): AppState 
   return { ...base, vinyls, ui: { ...base.ui, ...ui } };
 }
 
-function fakeView(className: string): ShelfView & HandView & { update: ReturnType<typeof vi.fn> } {
+type FakeView = ShelfView & HandView;
+
+function fakeView(className: string): FakeView {
   const el = document.createElement('div');
   el.className = className;
-  return { el, update: vi.fn() };
+  return { el, update: vi.fn<(state: AppState, renderers: Renderers) => void>() };
 }
 
-function roomActions(): RoomActions & Record<keyof RoomActions, ReturnType<typeof vi.fn>> {
-  return {
-    addVinyl: vi.fn(),
-    openSettings: vi.fn(),
-    closeOverlays: vi.fn(),
-    setDustSpeed: vi.fn(),
-    setFancyRendering: vi.fn(),
-    dropAudioFiles: vi.fn(),
-  };
+/** Un objeto de acciones cuyos métodos son espías de Vitest. */
+function spies<T extends object>(keys: readonly (keyof T)[]): T {
+  return Object.fromEntries(keys.map((key) => [key, vi.fn()])) as T;
 }
 
-function shelfActions(): ShelfActions & Record<keyof ShelfActions, ReturnType<typeof vi.fn>> {
-  return { pickVinyl: vi.fn(), addVinyl: vi.fn(), openEditor: vi.fn(), reorder: vi.fn() };
+function roomActions(): RoomActions {
+  return spies<RoomActions>(['addVinyl', 'openSettings', 'closeOverlays', 'setDustSpeed', 'setFancyRendering', 'dropAudioFiles']);
 }
 
-function handActions(): HandActions & Record<keyof HandActions, ReturnType<typeof vi.fn>> {
-  return {
-    setStage: vi.fn(),
-    flipDisc: vi.fn(),
-    putOnTurntable: vi.fn(),
-    backToShelf: vi.fn(),
-    edit: vi.fn(),
-    clean: vi.fn(),
-  };
+function shelfActions(): ShelfActions {
+  return spies<ShelfActions>(['pickVinyl', 'addVinyl', 'openEditor', 'reorder']);
+}
+
+function handActions(): HandActions {
+  return spies<HandActions>(['setStage', 'flipDisc', 'putOnTurntable', 'backToShelf', 'edit', 'clean']);
 }
 
 const mounted: HTMLElement[] = [];
@@ -92,7 +85,16 @@ function vinyls(n: number): Vinyl[] {
 // ---------------------------------------------------------------------------
 
 describe('createRoomView', () => {
-  function setup(): { room: RoomView; actions: ReturnType<typeof roomActions>; shelf: ReturnType<typeof fakeView>; hand: ReturnType<typeof fakeView>; editorEl: HTMLElement; turntableEl: HTMLElement } {
+  interface Setup {
+    room: RoomView;
+    actions: RoomActions;
+    shelf: FakeView;
+    hand: FakeView;
+    editorEl: HTMLElement;
+    turntableEl: HTMLElement;
+  }
+
+  function setup(): Setup {
     const actions = roomActions();
     const shelf = fakeView('estanteria-falsa');
     const hand = fakeView('mano-falsa');
@@ -478,7 +480,7 @@ describe('createHandView', () => {
     expect(actions.flipDisc).toHaveBeenCalledTimes(1);
     q(hand.el, 'mano-poner-a').click();
     q(hand.el, 'mano-poner-b').click();
-    expect(actions.putOnTurntable.mock.calls).toEqual([['A'], ['B']]);
+    expect(vi.mocked(actions.putOnTurntable).mock.calls).toEqual([['A'], ['B']]);
     q(hand.el, 'mano-editar').click();
     expect(actions.edit).toHaveBeenCalledTimes(1);
     q(hand.el, 'mano-guardar').click();

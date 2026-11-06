@@ -517,7 +517,6 @@ export function createShelfView(actions: ShelfActions): ShelfView {
       restructure(plan, byId, empty);
       lastKey = key;
     }
-    root.classList.toggle('est-vacia-estado', empty);
     const selectedId = state.ui.view === 'editor' ? state.ui.editorVinylId : null;
     refreshSpines(byId, renderers, dpr, selectedId);
     refreshCrates(plan, byId, renderers, dpr);
