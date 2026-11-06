@@ -561,15 +561,16 @@ describe('createHandView', () => {
 });
 
 describe('medidas de la mano', () => {
-  it('S = min(70vh, 560px) para un 12" y proporcional para 10" y 7"', () => {
-    expect(handSizes('12', 1440, 900).jacketPx).toBe(560);
-    expect(handSizes('12', 1440, 700).jacketPx).toBe(490);
-    expect(handSizes('10', 1440, 900).jacketPx).toBe(Math.round((560 * 260) / 315));
-    expect(handSizes('7', 1440, 900).jacketPx).toBe(320);
+  it('S = min(56vh, 560px) para un 12" y proporcional para 10" y 7"', () => {
+    expect(handSizes('12', 1440, 1100).jacketPx).toBe(560);
+    expect(handSizes('12', 1440, 800).jacketPx).toBe(448);
+    expect(handSizes('12', 1440, 700).jacketPx).toBe(392);
+    expect(handSizes('10', 1440, 1100).jacketPx).toBe(Math.round((560 * 260) / 315));
+    expect(handSizes('7', 1440, 1100).jacketPx).toBe(320);
   });
 
   it('el disco va a la escala de la carpeta y en pantallas estrechas S se limita al ancho', () => {
-    const s = handSizes('12', 1440, 900);
+    const s = handSizes('12', 1440, 1100);
     expect(s.discPx).toBe(Math.round((560 * 302) / 315));
     expect(s.gatefoldScale).toBe(1);
     const narrow = handSizes('12', 400, 900);

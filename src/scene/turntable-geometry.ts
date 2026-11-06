@@ -19,7 +19,7 @@
  *
  * El brazo gira desde la recta pivote→eje hacia el frente (y positiva):
  * la dirección pivote→aguja es la dirección pivote→eje rotada −θ en el
- * sentido de la pantalla. Así, en reposo (r = 165) el cabezal queda en la
+ * sentido de la pantalla. Así, en reposo (r = 182) el cabezal queda en la
  * parte delantera derecha del plato y, al entrar en el surco, barre hacia
  * la izquierda.
  *
@@ -50,8 +50,8 @@ export const PIVOT_DISTANCE_MM = Math.hypot(PIVOT_MM.x, PIVOT_MM.y);
 /** Longitud efectiva del brazo: del pivote a la punta de la aguja. */
 export const ARM_LENGTH_MM = 229;
 
-/** Radio bajo la aguja con el brazo en su soporte. */
-export const REST_RADIUS_MM = 165;
+/** Radio bajo la aguja con el brazo en su soporte: con 182 mm el tubo entero queda fuera del plato (a ≈ 161 mm del eje). */
+export const REST_RADIUS_MM = 182;
 
 /** Radio mínimo alcanzable: un poco más adentro del surco interior de un 12". */
 export const MIN_RADIUS_MM = discGeometry('12').innerGrooveMm - 4;

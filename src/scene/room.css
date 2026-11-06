@@ -275,7 +275,9 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: var(--esp-2) 4% 0;
+  /* Arriba se reserva el vuelo de la tapa abierta (≈ 45 mm por encima del plinto),
+     para que no pise la barra superior. */
+  padding: clamp(28px, 6.5vh, 64px) 4% 0;
   margin-bottom: -10px;
 }
 
@@ -548,10 +550,18 @@
     font-size: var(--tamano-m);
   }
 
+  /* Apilado con scroll: la escena y sus zonas miden lo que mide su contenido. Con
+     `min-height: 0` la fila de la escena se encogía al alto de la ventana y la zona
+     del tocadiscos se quedaba en 0 px, con el aparato desbordado fuera de la vista. */
   .hab-escena {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     padding: 0;
+    min-height: auto;
+  }
+
+  .hab-zona {
+    min-height: auto;
   }
 
   /* Cada zona lleva su trozo de tarima y de rodapié. */
@@ -583,7 +593,8 @@
   .hab-tocadiscos {
     flex: none;
     max-width: 640px;
-    padding: 0;
+    /* Vuelo de la tapa abierta: 45 mm sobre 450 mm de ancho del aparato. */
+    padding: 10.5% 0 0;
   }
 
   .hab-zona-estanteria {

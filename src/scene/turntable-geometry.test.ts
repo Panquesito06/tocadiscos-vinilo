@@ -8,6 +8,7 @@ import {
   PIVOT_DISTANCE_MM,
   PIVOT_MM,
   PIVOT_OFFSET_MM,
+  PLATTER_RADIUS_MM,
   REST_RADIUS_MM,
   armAngleForRadius,
   armScreenAngleDeg,
@@ -33,8 +34,21 @@ describe('constantes del brazo', () => {
   it('los límites del radio salen del surco interior del 12" y del soporte', () => {
     expect(MIN_RADIUS_MM).toBe(discGeometry('12').innerGrooveMm - 4);
     expect(MAX_RADIUS_MM).toBe(REST_RADIUS_MM);
-    expect(REST_RADIUS_MM).toBe(165);
     expect(ORBIT_RADIUS_MM).toBeCloseTo((38.1 - 7.24) / 2);
+  });
+
+  it('en el soporte, el brazo entero queda fuera del plato y de su canto estroboscópico', () => {
+    // Canto del plato con las marcas estroboscópicas: 7 mm por fuera del radio del plato.
+    const cantoMm = PLATTER_RADIUS_MM + 7;
+    const a = PIVOT_MM;
+    const b = stylusPointForRadius(REST_RADIUS_MM);
+    const vx = b.x - a.x;
+    const vy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, -(a.x * vx + a.y * vy) / (vx * vx + vy * vy)));
+    const closest = Math.hypot(a.x + t * vx, a.y + t * vy);
+    expect(closest).toBeGreaterThan(cantoMm);
+    // Y el soporte no se aleja tanto que la aguja salga por delante del plinto (394 − 162 mm).
+    expect(b.y).toBeLessThan(394 - 162 - 50);
   });
 });
 
@@ -46,11 +60,11 @@ describe('armAngleForRadius', () => {
     expect(armAngleForRadius(r)).toBeCloseTo(expected, 10);
   });
 
-  it('en reposo (165) el ángulo es pequeño y en el surco interior (60) es menor aún', () => {
-    const rest = armAngleForRadius(165) * DEG;
+  it('en reposo el ángulo es moderado y en el surco interior (60) es mucho menor', () => {
+    const rest = armAngleForRadius(REST_RADIUS_MM) * DEG;
     const inner = armAngleForRadius(60) * DEG;
-    expect(rest).toBeGreaterThan(40);
-    expect(rest).toBeLessThan(50);
+    expect(rest).toBeGreaterThan(45);
+    expect(rest).toBeLessThan(52);
     expect(inner).toBeGreaterThan(10);
     expect(inner).toBeLessThan(20);
     // Cuanto mayor es el radio, más se abre el brazo respecto a la recta pivote→eje.

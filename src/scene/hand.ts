@@ -3,8 +3,10 @@
  *
  * CONTRATO (lo implementa el módulo de escena de la habitación):
  *  - Capa centrada sobre la habitación (la habitación se oscurece detrás).
- *    El lado del objeto en px CSS es `S = min(70vh, 560px)` para un 12" y
- *    proporcional a `jacketSizeMm(format)` para 10" y 7". Los canvases se
+ *    El lado del objeto en px CSS es `S = min(56vh, 560px)` para un 12" y
+ *    proporcional a `jacketSizeMm(format)` para 10" y 7" (56 % y no más
+ *    para que, en una ventana de 800 px de alto, las dos filas de botones y
+ *    la ficha del disco quepan sin desplazarse). Los canvases se
  *    piden en píxeles de dispositivo (× devicePixelRatio) y se copian con
  *    `blit()` en canvases propios. Muestra el vinilo según `ui.handStage`:
  *      · `jacket-front`: carpeta de frente con su funda exterior encima;
@@ -69,7 +71,7 @@ export interface HandView {
 /** Lado máximo de la carpeta de 12" en px CSS. */
 export const HAND_MAX_SIDE_PX = 560;
 /** Fracción de la altura de la ventana que puede ocupar la carpeta de 12". */
-export const HAND_VIEWPORT_FRACTION = 0.7;
+export const HAND_VIEWPORT_FRACTION = 0.56;
 /** Lado mínimo, para que en ventanas diminutas el objeto siga siendo reconocible. */
 export const HAND_MIN_SIDE_PX = 160;
 /** Ancho de la composición con la funda asomando, en lados de carpeta. */
