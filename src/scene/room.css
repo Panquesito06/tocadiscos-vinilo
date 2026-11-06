@@ -1,0 +1,599 @@
+/*
+  Habitación de escucha: pared empapelada, rodapié de nogal y tarima;
+  el aparador de nogal con el tocadiscos encima a la izquierda y la
+  estantería a la derecha. Luz cálida desde arriba a la izquierda: los
+  materiales se aclaran hacia arriba a la izquierda y las sombras caen
+  hacia abajo a la derecha.
+*/
+
+.hab {
+  --hab-suelo: clamp(72px, 14vh, 150px);
+  --hab-rodapie: 14px;
+  --hab-margen: var(--esp-6);
+  --hab-veta-nogal: repeating-linear-gradient(
+    92deg,
+    rgba(0, 0, 0, 0) 0 13px,
+    rgba(0, 0, 0, 0.08) 13px 16px,
+    rgba(255, 236, 210, 0.035) 16px 27px,
+    rgba(0, 0, 0, 0.05) 27px 31px,
+    rgba(0, 0, 0, 0) 31px 46px
+  );
+  /* Tarima: tablas que corren de lado a lado, más anchas cuanto más cerca (perspectiva). */
+  --hab-tarima: linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0) 70%),
+    linear-gradient(
+      180deg,
+      transparent 0 13%,
+      rgba(0, 0, 0, 0.34) 13% calc(13% + 1px),
+      transparent calc(13% + 1px) 31%,
+      rgba(0, 0, 0, 0.34) 31% calc(31% + 1.5px),
+      transparent calc(31% + 1.5px) 54%,
+      rgba(0, 0, 0, 0.34) 54% calc(54% + 2px),
+      transparent calc(54% + 2px) 82%,
+      rgba(0, 0, 0, 0.34) 82% calc(82% + 2px),
+      transparent calc(82% + 2px)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 236, 210, 0.04) 0 7px,
+      rgba(0, 0, 0, 0.05) 7px 19px,
+      rgba(255, 236, 210, 0.025) 19px 31px,
+      rgba(0, 0, 0, 0.035) 31px 47px
+    ),
+    radial-gradient(130% 160% at 12% 0%, var(--tarima) 0%, var(--tarima-oscuro) 100%);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--texto-ui);
+  font-family: var(--fuente);
+  /* Pared: empapelado con un enrejado de rombos muy suave y luz cálida arriba a la izquierda. */
+  background: radial-gradient(90% 75% at 10% 0%, rgba(255, 214, 150, 0.17), rgba(255, 214, 150, 0) 70%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.2) 100%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.028) 0 2px, transparent 2px 24px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.028) 0 2px, transparent 2px 24px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 168px),
+    var(--tapiz);
+}
+
+.hab [hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ suelo y rodapié */
+
+.hab-suelo {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--hab-suelo);
+  background: var(--hab-tarima);
+}
+
+.hab-rodapie {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--hab-suelo);
+  height: var(--hab-rodapie);
+  background: linear-gradient(180deg, var(--nogal-claro) 0 2px, var(--nogal) 2px 60%, var(--nogal-oscuro)),
+    var(--hab-veta-nogal);
+  background-blend-mode: normal;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25), 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* ------------------------------------------------------------ barra superior */
+
+.hab-barra {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-4);
+  padding: var(--esp-3) var(--hab-margen);
+}
+
+.hab-titulo {
+  font-size: var(--tamano-l);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 1.1;
+  color: var(--kraft-claro);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.hab-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+}
+
+.hab-boton {
+  min-height: 36px;
+  padding: 0 var(--esp-4);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-m);
+  background: rgba(28, 27, 25, 0.74);
+  color: var(--texto-ui);
+  font-size: var(--tamano-s);
+  font-weight: 600;
+  box-shadow: var(--sombra-suave);
+  transition:
+    background-color var(--dur-rapida) var(--curva),
+    border-color var(--dur-rapida) var(--curva);
+}
+
+.hab-boton:hover {
+  background: var(--carbon-claro);
+  border-color: rgba(201, 166, 107, 0.5);
+}
+
+.hab-boton[aria-expanded='true'] {
+  border-color: var(--kraft);
+}
+
+.hab-boton-anadir {
+  background: var(--kraft);
+  border-color: var(--kraft-oscuro);
+  color: var(--carbon);
+}
+
+.hab-boton-anadir:hover {
+  background: var(--kraft-claro);
+  border-color: var(--kraft);
+}
+
+/* ------------------------------------------------------------ ajustes */
+
+.hab-ajustes {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% - var(--esp-1));
+  right: var(--hab-margen);
+  display: grid;
+  gap: var(--esp-4);
+  width: min(340px, calc(100vw - 2 * var(--esp-4)));
+  padding: var(--esp-4) var(--esp-5) var(--esp-5);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-l);
+  background: var(--fondo-ui);
+  color: var(--texto-ui);
+  box-shadow: var(--sombra-objeto);
+}
+
+.hab-ajustes-titulo {
+  font-size: var(--tamano-m);
+  font-weight: 800;
+  font-stretch: 112%;
+}
+
+.hab-campo {
+  display: grid;
+  gap: var(--esp-2);
+}
+
+.hab-campo-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esp-3);
+}
+
+.hab-campo-casilla {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.hab-etiqueta {
+  font-size: var(--tamano-s);
+  font-weight: 600;
+}
+
+.hab-lectura {
+  font-size: var(--tamano-s);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--kraft);
+}
+
+.hab-rango {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--kraft);
+}
+
+.hab-casilla {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--acento);
+}
+
+.hab-ayuda {
+  display: grid;
+  gap: var(--esp-2);
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--linea-ui);
+  font-size: var(--tamano-s);
+  color: var(--texto-ui-suave);
+}
+
+.hab-ayuda-titulo {
+  font-size: var(--tamano-s);
+  font-weight: 700;
+  color: var(--texto-ui);
+}
+
+.hab-ayuda-lista {
+  display: grid;
+  gap: var(--esp-1);
+  margin: 0;
+  padding-left: 1.1em;
+}
+
+/* ------------------------------------------------------------ escena */
+
+.hab-escena {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--esp-6);
+  min-height: 0;
+  padding: 0 var(--hab-margen) calc(var(--hab-suelo) * 0.42);
+}
+
+.hab-zona {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.hab-zona-tocadiscos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* El tocadiscos se escala solo (ancho 100 % y proporción fija, con tope de alto). */
+.hab-tocadiscos {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--esp-2) 4% 0;
+  margin-bottom: -10px;
+}
+
+.hab-tocadiscos > * {
+  min-width: 0;
+}
+
+.hab-zona-estanteria {
+  display: flex;
+  flex-direction: column;
+}
+
+.hab-zona-estanteria > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------ aparador */
+
+.hab-aparador {
+  --aparador-alto: clamp(96px, 18vh, 190px);
+  position: relative;
+  flex: none;
+  width: 100%;
+  max-width: 1040px;
+}
+
+/* Sombra en la tarima, hacia abajo a la derecha. */
+.hab-aparador::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 4%;
+  right: -3%;
+  bottom: -10px;
+  height: 22px;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+.hab-aparador-tapa {
+  position: relative;
+  height: 18px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, rgba(255, 236, 210, 0.12), rgba(255, 236, 210, 0) 45%, rgba(0, 0, 0, 0.12)),
+    var(--hab-veta-nogal), linear-gradient(90deg, var(--nogal-claro), var(--nogal) 55%, var(--nogal-oscuro));
+}
+
+/* Canto delantero del tablero, iluminado desde arriba. */
+.hab-aparador-tapa::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 6px;
+  background: linear-gradient(180deg, var(--nogal-claro), var(--nogal) 70%, var(--nogal-oscuro));
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+}
+
+.hab-aparador-frente {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  height: var(--aparador-alto);
+  margin-top: 6px;
+  padding: 10px 12px 12px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0.12)),
+    linear-gradient(90deg, rgba(255, 236, 210, 0.06), rgba(0, 0, 0, 0.2)), var(--nogal-oscuro);
+  box-shadow: var(--sombra-objeto);
+}
+
+.hab-puerta {
+  position: relative;
+  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(255, 236, 210, 0.1), rgba(255, 236, 210, 0) 45%, rgba(0, 0, 0, 0.18)),
+    var(--hab-veta-nogal), var(--nogal);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 2px 2px 0 rgba(255, 236, 210, 0.07),
+    inset -3px -3px 7px rgba(0, 0, 0, 0.28);
+}
+
+.hab-tirador {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: clamp(26px, 32%, 58px);
+  transform: translateY(-50%);
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--aluminio-claro), var(--aluminio) 50%, var(--aluminio-oscuro));
+  box-shadow: 2px 3px 4px rgba(0, 0, 0, 0.5);
+}
+
+.hab-puerta:first-child .hab-tirador {
+  right: 14px;
+}
+
+.hab-puerta:last-child .hab-tirador {
+  left: 14px;
+}
+
+.hab-aparador-patas {
+  display: flex;
+  justify-content: space-between;
+  height: 10px;
+  padding: 0 6%;
+}
+
+.hab-pata {
+  width: 22px;
+  height: 100%;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--nogal), var(--nogal-oscuro));
+}
+
+/* ------------------------------------------------------------ cajón del editor */
+
+.hab-cajon {
+  position: fixed;
+  z-index: 6;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100%, max(42%, 440px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--linea-ui);
+  background: var(--fondo-ui);
+  color: var(--texto-ui);
+  box-shadow: -14px 0 32px rgba(0, 0, 0, 0.45);
+  transform: translateX(104%);
+  visibility: hidden;
+  transition:
+    transform var(--dur-media) var(--curva),
+    visibility 0s linear var(--dur-media);
+}
+
+.hab-cajon-abierto .hab-cajon {
+  transform: none;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/* ------------------------------------------------------------ vinilo en la mano */
+
+.hab-capa-mano {
+  position: fixed;
+  z-index: 8;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--esp-5) var(--esp-4);
+}
+
+.hab-velo {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 18%, rgba(28, 22, 16, 0.62), rgba(8, 7, 6, 0.88));
+  backdrop-filter: blur(2px);
+  animation: hab-aparecer var(--dur-media) var(--curva);
+}
+
+.hab-capa-mano > :not(.hab-velo) {
+  position: relative;
+  z-index: 1;
+  margin: auto;
+  animation: hab-aparecer var(--dur-media) var(--curva);
+}
+
+@keyframes hab-aparecer {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ aviso */
+
+.hab-aviso {
+  position: fixed;
+  z-index: 10;
+  right: var(--esp-6);
+  bottom: var(--esp-5);
+  max-width: min(420px, calc(100vw - 2 * var(--esp-4)));
+  padding: var(--esp-3) var(--esp-4);
+  border: 1px solid var(--linea-ui);
+  border-left: 3px solid var(--acento);
+  border-radius: var(--radio-m);
+  background: var(--fondo-ui);
+  color: var(--texto-ui);
+  font-size: var(--tamano-s);
+  box-shadow: var(--sombra-suave);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition:
+    opacity var(--dur-media) var(--curva),
+    transform var(--dur-media) var(--curva),
+    visibility 0s linear var(--dur-media);
+}
+
+.hab-aviso.es-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+/* ------------------------------------------------------------ soltar archivos */
+
+.hab-destino {
+  position: fixed;
+  z-index: 12;
+  inset: var(--esp-3);
+  display: grid;
+  place-items: center;
+  border: 3px dashed var(--kraft);
+  border-radius: var(--radio-l);
+  background: rgba(28, 27, 25, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-rapida) var(--curva),
+    visibility 0s linear var(--dur-rapida);
+}
+
+.hab-soltando .hab-destino {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.hab-destino-texto {
+  padding: var(--esp-3) var(--esp-5);
+  border-radius: var(--radio-m);
+  background: var(--fondo-ui);
+  color: var(--kraft-claro);
+  font-weight: 700;
+  font-stretch: 112%;
+  box-shadow: var(--sombra-suave);
+}
+
+/* ------------------------------------------------------------ pantallas estrechas */
+
+@media (max-width: 899.98px) {
+  .hab {
+    --hab-margen: var(--esp-4);
+    grid-template-rows: auto auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .hab-suelo,
+  .hab-rodapie {
+    display: none;
+  }
+
+  .hab-barra {
+    position: sticky;
+    top: 0;
+    background: rgba(44, 67, 64, 0.92);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .hab-titulo {
+    font-size: var(--tamano-m);
+  }
+
+  .hab-escena {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+
+  /* Cada zona lleva su trozo de tarima y de rodapié. */
+  .hab-zona::before,
+  .hab-zona::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    right: 0;
+  }
+
+  .hab-zona::after {
+    bottom: 0;
+    height: 56px;
+    background: var(--hab-tarima);
+  }
+
+  .hab-zona::before {
+    bottom: 56px;
+    height: 10px;
+    background: linear-gradient(180deg, var(--nogal-claro) 0 2px, var(--nogal) 2px 60%, var(--nogal-oscuro));
+  }
+
+  .hab-zona-tocadiscos {
+    padding: var(--esp-4) var(--esp-4) 28px;
+  }
+
+  .hab-tocadiscos {
+    flex: none;
+    max-width: 640px;
+    padding: 0;
+  }
+
+  .hab-zona-estanteria {
+    height: max(520px, 88svh);
+    padding: var(--esp-6) var(--esp-4) 26px;
+  }
+
+  .hab-aviso {
+    left: var(--esp-4);
+    right: var(--esp-4);
+    max-width: none;
+  }
+}

@@ -62,15 +62,25 @@
  * IMPLEMENTACIÓN:
  *  - Todo el aparato se dibuja en una "caja de diseño" de 450 × 394 mm
  *    (`STAGE_MM`) y se escala con la variable CSS `--tt-escala` (px CSS por
- *    mm), medida con ResizeObserver sobre el elemento raíz. Las posiciones
+ *    mm), medida con ResizeObserver sobre el elemento raíz (sin
+ *    ResizeObserver, con el evento `resize` de la ventana). Las posiciones
  *    derivadas de la geometría (eje, pivote, soporte, palanca) se pasan al
  *    CSS como variables en mm; el resto del trazado vive en turntable.css.
  *  - Vista cenital: el plinto se ve desde arriba con su cara frontal debajo
  *    (2.5D); todo lo que hay encima es cenital puro, así las circunferencias
  *    son círculos y el mapeo puntero → mm es directo.
+ *  - El plato tiene tres capas: el canto con dos filas de marcas
+ *    estroboscópicas (gira), la cara de aluminio torneado con su reflejo
+ *    cónico en forma de pajarita (fija: el torneado es concéntrico y su
+ *    reflejo no gira con el plato) y el tapete de fieltro (gira).
  *  - La tapa cerrada bloquea los punteros sobre el plato y el brazo con un
- *    elemento invisible (`.tt-tapa-bloqueo`); la lámina de la tapa nunca
- *    recibe punteros, de modo que los controles siguen operativos.
+ *    elemento invisible (`.tt-tapa-bloqueo`) y `pointer-events: none` en
+ *    las zonas de arrastre; la lámina de la tapa nunca recibe punteros, de
+ *    modo que los controles frontales siguen operativos. El teclado no se
+ *    bloquea: el brazo sigue siendo accesible con la tapa cerrada.
+ *  - Si la mano se queda quieta sobre el disco sin soltarlo, deja de haber
+ *    eventos `pointermove`; `update()` lo detecta y manda `handPlatter(0)`
+ *    para que el plato no siga girando a la última velocidad de la mano.
  */
 import { discGeometry } from '../core/geometry';
 import type { Format, HoleSize, Rpm, TurntableState } from '../core/types';
@@ -89,7 +99,6 @@ import {
   clampRadius,
   pointerArmAngle,
   pointerToRadius,
-  stylusPointForRadius,
   type PointMm,
 } from './turntable-geometry';
 import './turntable.css';
@@ -153,21 +162,44 @@ export const STAGE_MM = Object.freeze({ width: 450, height: 394 });
 /** Centro del plato dentro de la caja de diseño. */
 export const SPINDLE_MM: Readonly<PointMm> = Object.freeze({ x: 175, y: 162 });
 
-/** Fracción del brazo en reposo (pivote → aguja) donde está el poste del soporte. */
-const REST_POST_FRACTION = 0.92;
+/** Caja de referencia en px CSS en la que cabe el aparato antes de medirlo. */
+export const REFERENCE_BOX_PX = Object.freeze({ width: 560, height: 420 });
+
+/** Escala inicial (px CSS por mm) hasta que se mide el elemento: cabe en la caja de referencia. */
+export const DEFAULT_PX_PER_MM = Math.min(
+  REFERENCE_BOX_PX.width / STAGE_MM.width,
+  REFERENCE_BOX_PX.height / STAGE_MM.height,
+);
+
+/** Pivote del brazo dentro de la caja de diseño. */
+const PIVOT_STAGE_MM: Readonly<PointMm> = Object.freeze({
+  x: SPINDLE_MM.x + PIVOT_MM.x,
+  y: SPINDLE_MM.y + PIVOT_MM.y,
+});
+
+/**
+ * Punto del dibujo del brazo (mm, sistema del brazo: pivote en el origen y
+ * aguja en (229, 0)) que descansa sobre el poste del soporte: bajo la curva
+ * del tubo, justo detrás del cabezal y fuera del canto del plato.
+ */
+const REST_POST_LOCAL_MM: Readonly<PointMm> = Object.freeze({ x: 194, y: -11.5 });
 
 /** Posición de la palanca de elevación respecto al pivote (delante, fuera del barrido). */
 const CUE_OFFSET_MM: Readonly<PointMm> = Object.freeze({ x: -12, y: 40 });
 
-/** Escala provisional hasta que se mide el elemento (≈ 495 px de ancho). */
-const DEFAULT_PX_PER_MM = 1.1;
+/** Paso de Re Pág / Av Pág en el brazo. */
+const PAGE_STEP_MM = 10;
 
 /** Separación entre pasadas del cepillo, en px CSS de recorrido del puntero. */
 const BRUSH_STEP_PX = 40;
-/** Velocidad del gesto que cuenta como pasada de fuerza 1. */
-const BRUSH_FULL_SPEED_PX_PER_SEC = 1000;
+/** Velocidad media del gesto que cuenta como pasada de fuerza 1. */
+const BRUSH_FULL_SPEED_PX_PER_SEC = 900;
+/** Pasadas como máximo por evento (un salto grande del puntero no vale por diez). */
+const BRUSH_MAX_STROKES_PER_EVENT = 3;
 /** Muestras de la media móvil de la velocidad angular de la mano. */
 const SCRATCH_SAMPLES = 3;
+/** Sin movimiento durante este tiempo, la mano quieta sujeta el plato. */
+const HAND_IDLE_MS = 80;
 
 /** Desplazamiento base de la sombra del disco (luz desde arriba a la izquierda), en mm. */
 const DISC_SHADOW_MM: Readonly<PointMm> = Object.freeze({ x: 1.2, y: 2.2 });
@@ -176,6 +208,8 @@ const SHADOW_WOBBLE_MM = 2;
 
 const RPMS: readonly Rpm[] = [33, 45, 78];
 const DEG_TO_RAD = Math.PI / 180;
+const PITCH_STEP = 0.1;
+const VOLUME_STEP = 0.01;
 
 let instanceCounter = 0;
 
@@ -227,15 +261,18 @@ function setDisabled(el: HTMLButtonElement | HTMLInputElement, disabled: boolean
   if (el.disabled !== disabled) el.disabled = disabled;
 }
 
-function setRangeValue(input: HTMLInputElement, value: string): void {
-  if (input.value !== value) input.value = value;
+/** Sincroniza un deslizador con el estado sin pelear con el usuario por redondeos. */
+function setRangeValue(input: HTMLInputElement, value: number, step: number): void {
+  if (!Number.isFinite(value)) return;
+  if (Math.abs(Number(input.value) - value) < step / 2) return;
+  input.value = String(value);
 }
 
 function capturePointer(el: Element, pointerId: number): void {
   try {
     el.setPointerCapture(pointerId);
   } catch {
-    // Algunos entornos (tests) no implementan la captura: el arrastre sigue funcionando.
+    // Algunos entornos (tests, punteros ya liberados) no admiten la captura: el arrastre sigue funcionando.
   }
 }
 
@@ -258,13 +295,17 @@ function isFormControl(el: Element | null): boolean {
   return (el as HTMLElement).isContentEditable === true;
 }
 
+function hasDiscIn(frame: TurntableFrame | null): boolean {
+  return frame !== null && frame.discCanvas !== null && frame.discFormat !== null;
+}
+
 // ---------------------------------------------------------------------------
 // Formato de textos
 // ---------------------------------------------------------------------------
 
 /** "m:ss" con los segundos redondeados hacia abajo. */
 export function formatClock(sec: number): string {
-  const total = Math.max(0, Math.floor(sec));
+  const total = Number.isFinite(sec) ? Math.max(0, Math.floor(sec)) : 0;
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s < 10 ? '0' : ''}${s}`;
@@ -285,12 +326,17 @@ export function formatPosition(positionSec: number, durationSec: number): string
   return `${formatClock(positionSec)} / ${formatClock(durationSec)}`;
 }
 
-function describeArm(frame: TurntableFrame): string {
+/** Valor textual del brazo para lectores de pantalla ("Cara A, canción 2, 3:10"). */
+export function describeTonearm(frame: TurntableFrame): string {
   const t = frame.state.tonearm;
   if (t.onRest) return 'En el soporte';
-  const parts: string[] = [frame.sideName ?? 'Sin disco'];
+  if (!hasDiscIn(frame)) return t.lifted ? 'Sobre el plato, aguja levantada' : 'Sobre el plato';
+  const parts: string[] = [frame.sideName ?? 'Disco'];
   if (frame.nowPlaying) parts.push(`canción ${frame.nowPlaying.trackIndex + 1}`);
-  if (frame.discFormat) parts.push(formatPosition(frame.positionSec, frame.sideDurationSec));
+  const pos = frame.positionSec;
+  if (pos < 0) parts.push('entrada');
+  else if (pos > frame.sideDurationSec) parts.push('salida');
+  else parts.push(formatClock(pos));
   if (t.lifted) parts.push('aguja levantada');
   return parts.join(', ');
 }
@@ -301,7 +347,9 @@ function describeArm(frame: TurntableFrame): string {
 
 interface Dom {
   root: HTMLElement;
+  stage: HTMLElement;
   platter: HTMLElement;
+  mat: HTMLElement;
   disc: HTMLElement;
   discCanvas: HTMLCanvasElement;
   discShadow: HTMLElement;
@@ -330,49 +378,65 @@ interface Dom {
   brushSprite: HTMLElement;
 }
 
+/** Atributo `style` para un color de relleno o de parada tomado de los tokens. */
+function paint(prop: 'fill' | 'stop-color' | 'stroke', value: string): string {
+  return `style="${prop}: ${value}"`;
+}
+
 /** Marcado SVG del brazo, en mm, con el pivote en (0, 0) y la aguja en (229, 0). */
 function tonearmSvg(id: string): string {
   const tube = `${id}-tubo`;
   const weight = `${id}-peso`;
   const shell = `${id}-cabezal`;
   const gimbal = `${id}-gimbal`;
+  const deep = 'color-mix(in srgb, var(--aluminio-oscuro), var(--carbon) 30%)';
   return `
 <svg class="tt-brazo-svg" viewBox="-72 -26 316 52" aria-hidden="true" focusable="false">
   <defs>
     <linearGradient id="${tube}" x1="0" y1="-3" x2="0" y2="3" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f7f8f9"/><stop offset="0.45" stop-color="#b8bcc0"/><stop offset="1" stop-color="#5f6468"/>
+      <stop offset="0" ${paint('stop-color', 'var(--aluminio-claro)')}/>
+      <stop offset="0.45" ${paint('stop-color', 'var(--aluminio)')}/>
+      <stop offset="1" ${paint('stop-color', deep)}/>
     </linearGradient>
-    <linearGradient id="${weight}" x1="0" y1="-10" x2="0" y2="10" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#4a4e52"/><stop offset="0.35" stop-color="#1f2224"/><stop offset="1" stop-color="#0c0d0e"/>
+    <linearGradient id="${weight}" x1="0" y1="-9" x2="0" y2="9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" ${paint('stop-color', 'color-mix(in srgb, var(--aluminio-oscuro), var(--carbon) 55%)')}/>
+      <stop offset="0.35" ${paint('stop-color', 'var(--carbon-claro)')}/>
+      <stop offset="1" ${paint('stop-color', 'var(--carbon)')}/>
     </linearGradient>
     <linearGradient id="${shell}" x1="0" y1="-8" x2="0" y2="4" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3a3d40"/><stop offset="0.5" stop-color="#17191b"/><stop offset="1" stop-color="#050506"/>
+      <stop offset="0" ${paint('stop-color', 'color-mix(in srgb, var(--aluminio-oscuro), var(--carbon) 60%)')}/>
+      <stop offset="0.5" ${paint('stop-color', 'var(--carbon-claro)')}/>
+      <stop offset="1" ${paint('stop-color', 'var(--carbon)')}/>
     </linearGradient>
     <radialGradient id="${gimbal}" cx="0.35" cy="0.3" r="0.8">
-      <stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#b8bcc0"/><stop offset="1" stop-color="#5f6468"/>
+      <stop offset="0" ${paint('stop-color', 'var(--aluminio-claro)')}/>
+      <stop offset="0.5" ${paint('stop-color', 'var(--aluminio)')}/>
+      <stop offset="1" ${paint('stop-color', deep)}/>
     </radialGradient>
   </defs>
   <g class="tt-contrapeso">
-    <rect x="-66" y="-10" width="30" height="20" rx="3" fill="url(#${weight})"/>
-    <rect x="-66" y="-10" width="30" height="20" rx="3" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="0.6"/>
-    <rect x="-58" y="-10" width="1.2" height="20" fill="rgba(255,255,255,0.14)"/>
-    <rect x="-50" y="-10" width="1.2" height="20" fill="rgba(255,255,255,0.14)"/>
-    <rect x="-42" y="-10" width="1.2" height="20" fill="rgba(255,255,255,0.14)"/>
+    <rect x="-60" y="-9" width="24" height="18" rx="3" fill="url(#${weight})"/>
+    <rect x="-60" y="-9" width="24" height="18" rx="3" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="0.6"/>
+    <rect x="-53" y="-9" width="1.2" height="18" fill="rgba(255,255,255,0.14)"/>
+    <rect x="-46" y="-9" width="1.2" height="18" fill="rgba(255,255,255,0.14)"/>
+    <rect x="-39" y="-9" width="1.2" height="18" fill="rgba(255,255,255,0.1)"/>
   </g>
   <rect x="-38" y="-2.6" width="42" height="5.2" rx="2.2" fill="url(#${tube})"/>
   <circle cx="0" cy="0" r="10" fill="url(#${gimbal})"/>
-  <circle cx="0" cy="0" r="4" fill="#2a2d30"/>
-  <circle cx="0" cy="0" r="1.4" fill="#d9dcdf"/>
+  <circle cx="0" cy="0" r="4" ${paint('fill', 'var(--carbon-claro)')}/>
+  <circle cx="0" cy="0" r="1.4" ${paint('fill', 'var(--aluminio-claro)')}/>
   <path d="M 8 0 C 95 0 135 -2 165 -8 S 198 -11.5 208 -9.5" fill="none" stroke="url(#${tube})" stroke-width="4.8" stroke-linecap="round"/>
   <path d="M 8 -1.2 C 95 -1.2 135 -3.2 165 -9.2 S 198 -12.7 208 -10.7" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="0.9" stroke-linecap="round"/>
   <g class="tt-cabezal-dibujo" transform="rotate(22 229 0)">
     <path d="M 205 -8 L 231 -8 L 233 -2 L 233 4 L 205 4 Z" fill="url(#${shell})"/>
     <path d="M 205 -8 L 231 -8" stroke="rgba(255,255,255,0.35)" stroke-width="0.7"/>
-    <path d="M 207 -8 C 203.5 -12 199.5 -14.5 195 -13.5" fill="none" stroke="#d8dbde" stroke-width="1.6" stroke-linecap="round"/>
-    <rect x="212" y="-5" width="16" height="8" rx="1" fill="#1b1d1f"/>
-    <rect x="214" y="-3.6" width="12" height="1.8" fill="#d1302a"/>
-    <line x1="223" y1="3" x2="229" y2="0.4" stroke="#e6e9eb" stroke-width="0.8"/>
-    <circle cx="229" cy="0" r="1" fill="#ffffff"/>
+    <path d="M 207 -8 C 203.5 -12 199.5 -14.5 195 -13.5" fill="none" ${paint('stroke', 'var(--aluminio-claro)')} stroke-width="1.6" stroke-linecap="round"/>
+    <rect x="212" y="-5" width="16" height="8" rx="1" ${paint('fill', 'var(--carbon)')}/>
+    <rect x="214" y="-3.6" width="12" height="1.8" ${paint('fill', 'var(--rojo-emi)')}/>
+    <circle cx="214.5" cy="1.4" r="0.7" ${paint('fill', 'var(--aluminio)')}/>
+    <circle cx="225.5" cy="1.4" r="0.7" ${paint('fill', 'var(--aluminio)')}/>
+    <line x1="223" y1="3" x2="229" y2="0.4" ${paint('stroke', 'var(--aluminio-claro)')} stroke-width="0.8"/>
+    <circle cx="229" cy="0" r="1" ${paint('fill', 'var(--aluminio-claro)')}/>
   </g>
 </svg>`;
 }
@@ -385,27 +449,32 @@ function buildPlinth(): HTMLElement[] {
   ];
 }
 
-function buildPlatter(): Pick<Dom, 'platter' | 'disc' | 'discCanvas' | 'discShadow' | 'shine' | 'adapter' | 'platterTouch'> & {
-  nodes: HTMLElement[];
-} {
-  const well = h('div', 'tt-plato-pozo', { 'aria-hidden': 'true' });
-  const platter = h('div', 'tt-plato', { 'aria-hidden': 'true' }, [h('div', 'tt-estrobo'), h('div', 'tt-tapete')]);
-  const discShadow = h('div', 'tt-disco-sombra', { 'aria-hidden': 'true', hidden: true });
-  const discCanvas = h('canvas', 'tt-disco-canvas', { 'aria-hidden': 'true' });
-  const disc = h('div', 'tt-disco', { 'data-test': 'tt-disco', 'aria-hidden': 'true', hidden: true }, [discCanvas]);
-  const spindle = h('div', 'tt-eje', { 'aria-hidden': 'true' });
-  const adapter = h('div', 'tt-adaptador', { 'aria-hidden': 'true', hidden: true });
-  const shine = h('div', 'tt-brillo', { 'aria-hidden': 'true', hidden: true });
-  const platterTouch = h('div', 'tt-plato-toque', { 'aria-hidden': 'true' });
+type PlatterParts = Pick<Dom, 'platter' | 'mat' | 'disc' | 'discCanvas' | 'discShadow' | 'shine' | 'adapter' | 'platterTouch'>;
+
+function buildPlatter(): PlatterParts & { nodes: HTMLElement[] } {
+  const hidden = { 'aria-hidden': 'true' } as const;
+  const well = h('div', 'tt-circulo tt-plato-pozo', hidden);
+  const platter = h('div', 'tt-circulo tt-plato', hidden, [h('div', 'tt-estrobo')]);
+  const face = h('div', 'tt-circulo tt-plato-cara', hidden);
+  const mat = h('div', 'tt-circulo tt-tapete', hidden, [h('span', 'tt-tapete-marca', {}, ['Tocadiscos'])]);
+  const lamp = h('div', 'tt-circulo tt-estrobo-luz', hidden);
+  const discShadow = h('div', 'tt-disco-sombra', { ...hidden, hidden: true });
+  const discCanvas = h('canvas', 'tt-disco-canvas', hidden);
+  const disc = h('div', 'tt-circulo tt-disco', { 'data-test': 'tt-disco', ...hidden, hidden: true }, [discCanvas]);
+  const spindle = h('div', 'tt-eje', hidden);
+  const adapter = h('div', 'tt-adaptador', { ...hidden, hidden: true });
+  const shine = h('div', 'tt-circulo tt-brillo', { ...hidden, hidden: true });
+  const platterTouch = h('div', 'tt-circulo tt-plato-toque', hidden);
   return {
     platter,
+    mat,
     disc,
     discCanvas,
     discShadow,
     shine,
     adapter,
     platterTouch,
-    nodes: [well, platter, discShadow, disc, spindle, adapter, shine, platterTouch],
+    nodes: [well, platter, face, mat, lamp, discShadow, disc, spindle, adapter, shine, platterTouch],
   };
 }
 
@@ -431,62 +500,82 @@ function buildTonearm(id: string): Pick<Dom, 'arm' | 'headshell' | 'cue'> & { no
   return { arm, headshell, cue, nodes: [rest, pivot, arm, cue] };
 }
 
-function buildControls(): Pick<
+type ControlParts = Pick<
   Dom,
   'power' | 'start' | 'speed' | 'pitch' | 'pitchReadout' | 'volume' | 'display' | 'displayTitle' | 'displaySide' | 'displayTime'
-> & { nodes: HTMLElement[] } {
-  const power = button('tt-boton tt-encendido', 'tt-encendido', 'Encendido', undefined, true);
-  power.append(h('span', 'tt-led'), h('span', 'tt-icono-encendido'));
+>;
 
-  const start = button('tt-start', 'tt-start', 'Marcha y paro del plato', undefined, false);
-  const startLabel = h('span', 'tt-start-etiqueta', { 'aria-hidden': 'true' }, ['Marcha']);
-
-  const speedGroup = h('div', 'tt-velocidad', { role: 'group', 'aria-label': 'Velocidad del plato' });
+function buildSpeedSelector(): { group: HTMLElement; speed: Record<Rpm, HTMLButtonElement> } {
+  const row = h('div', 'tt-velocidad-botones');
   const speed = {} as Record<Rpm, HTMLButtonElement>;
   for (const rpm of RPMS) {
     const b = button('tt-boton tt-rpm', `tt-${rpm}`, `${rpm} rpm`, String(rpm), rpm === 33);
     b.prepend(h('span', 'tt-led'));
     speed[rpm] = b;
-    speedGroup.append(b);
+    row.append(b);
   }
-  speedGroup.append(h('span', 'tt-velocidad-etiqueta', { 'aria-hidden': 'true' }, ['rpm']));
+  const group = h('div', 'tt-velocidad', { role: 'group', 'aria-label': 'Velocidad del plato' }, [
+    row,
+    h('span', 'tt-velocidad-etiqueta', { 'aria-hidden': 'true' }, ['rpm']),
+  ]);
+  return { group, speed };
+}
 
+function buildPitch(): { box: HTMLElement; pitch: HTMLInputElement; pitchReadout: HTMLElement } {
   const pitchReadout = h('output', 'tt-pitch-lectura', { 'aria-hidden': 'true' }, ['+0,0 %']);
   const pitch = h('input', 'tt-pitch', {
     type: 'range',
     min: '-8',
     max: '8',
-    step: '0.1',
+    step: String(PITCH_STEP),
     value: '0',
     'data-test': 'tt-pitch',
     'aria-label': 'Ajuste fino de velocidad',
     'aria-valuetext': '+0,0 %',
   });
-  const pitchBox = h('div', 'tt-pitch-caja', {}, [
+  const box = h('div', 'tt-pitch-caja', {}, [
     pitchReadout,
-    h('div', 'tt-pitch-escala', { 'aria-hidden': 'true' }, [h('span', 'tt-pitch-mas', {}, ['+']), h('span', 'tt-pitch-menos', {}, ['−'])]),
+    h('span', 'tt-pitch-mas', { 'aria-hidden': 'true' }, ['+']),
+    h('div', 'tt-pitch-escala', { 'aria-hidden': 'true' }),
+    h('span', 'tt-pitch-menos', { 'aria-hidden': 'true' }, ['−']),
     h('div', 'tt-pitch-ranura', { 'aria-hidden': 'true' }),
     pitch,
   ]);
+  return { box, pitch, pitchReadout };
+}
 
+function buildVolume(): { box: HTMLElement; volume: HTMLInputElement } {
   const volume = h('input', 'tt-volumen', {
     type: 'range',
     min: '0',
     max: '1',
-    step: '0.01',
+    step: String(VOLUME_STEP),
     value: '0.85',
     'data-test': 'tt-volumen',
     'aria-label': 'Volumen',
   });
-  const volumeBox = h('div', 'tt-volumen-caja', {}, [
+  const box = h('div', 'tt-volumen-caja', {}, [
     h('span', 'tt-volumen-etiqueta', { 'aria-hidden': 'true' }, ['Volumen']),
     h('div', 'tt-volumen-ranura', { 'aria-hidden': 'true' }),
     volume,
   ]);
+  return { box, volume };
+}
+
+function buildControls(): ControlParts & { nodes: HTMLElement[] } {
+  const power = button('tt-boton tt-encendido', 'tt-encendido', 'Encendido', undefined, true);
+  power.append(h('span', 'tt-led'), h('span', 'tt-icono-encendido'));
+
+  const start = button('tt-start', 'tt-start', 'Marcha y paro del plato', undefined, false);
+  const startLabel = h('span', 'tt-start-etiqueta', { 'aria-hidden': 'true' }, ['Marcha']);
+  const { group: speedGroup, speed } = buildSpeedSelector();
+  const { box: pitchBox, pitch, pitchReadout } = buildPitch();
+  const { box: volumeBox, volume } = buildVolume();
 
   const displayTitle = h('div', 'tt-pantalla-titulo', {}, ['Sin disco']);
   const displaySide = h('span', 'tt-pantalla-cara');
   const displayTime = h('span', 'tt-pantalla-tiempo');
+  // Solo se anuncia el título: la línea del tiempo cambia cada segundo y no debe hablar.
   const display = h('div', 'tt-pantalla', { 'data-test': 'tt-pantalla', 'aria-live': 'polite', 'aria-atomic': 'false' }, [
     displayTitle,
     h('div', 'tt-pantalla-linea', { 'aria-live': 'off' }, [displaySide, displayTime]),
@@ -508,10 +597,10 @@ function buildControls(): Pick<
 }
 
 function buildFront(): Pick<Dom, 'remove' | 'flip' | 'adapterToggle' | 'lidToggle' | 'brushToggle'> & { nodes: HTMLElement[] } {
-  const remove = button('tt-boton tt-boton-frente', 'tt-quitar', 'Quitar el disco del plato', 'Quitar disco');
+  const remove = button('tt-boton tt-boton-frente', 'tt-quitar', 'Quitar disco del plato', 'Quitar disco');
   const flip = button('tt-boton tt-boton-frente', 'tt-voltear', 'Dar la vuelta al disco', 'Dar la vuelta');
   const adapterToggle = button('tt-boton tt-boton-frente', 'tt-centrador', 'Centrador de 45 rpm', 'Centrador', false);
-  const lidToggle = button('tt-boton tt-boton-frente', 'tt-tapa', 'Cerrar o abrir la tapa', 'Tapa', false);
+  const lidToggle = button('tt-boton tt-boton-frente', 'tt-tapa', 'Tapa cerrada', 'Tapa', false);
   const brushToggle = button('tt-boton tt-boton-frente', 'tt-cepillo', 'Cepillo antipolvo', 'Cepillo', false);
   const front = h('div', 'tt-frente', {}, [
     h('span', 'tt-placa', { 'aria-hidden': 'true' }, ['Tocadiscos']),
@@ -531,27 +620,32 @@ function buildLid(): Pick<Dom, 'lidBlocker' | 'brushSprite'> & { nodes: HTMLElem
   return { lidBlocker, brushSprite, nodes: [lidBlocker, lidScene, brushSprite] };
 }
 
+/** Un punto del dibujo del brazo llevado a la caja de diseño con el brazo girado `angleDeg`. */
+function armPointToStage(local: PointMm, angleDeg: number): PointMm {
+  const a = angleDeg * DEG_TO_RAD;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: PIVOT_STAGE_MM.x + local.x * c - local.y * s, y: PIVOT_STAGE_MM.y + local.x * s + local.y * c };
+}
+
 /** Variables CSS (en mm) con las posiciones que dependen de la geometría del brazo. */
 function applyLayoutVars(root: HTMLElement): void {
-  const pivot = { x: SPINDLE_MM.x + PIVOT_MM.x, y: SPINDLE_MM.y + PIVOT_MM.y };
-  const stylusRest = stylusPointForRadius(REST_RADIUS_MM);
-  const restPost = {
-    x: pivot.x + REST_POST_FRACTION * (SPINDLE_MM.x + stylusRest.x - pivot.x),
-    y: pivot.y + REST_POST_FRACTION * (SPINDLE_MM.y + stylusRest.y - pivot.y),
-  };
+  const restAngle = armScreenAngleDeg(REST_RADIUS_MM);
+  const restPost = armPointToStage(REST_POST_LOCAL_MM, restAngle);
   const vars: Record<string, number> = {
+    '--tt-escala': DEFAULT_PX_PER_MM,
     '--tt-eje-x': SPINDLE_MM.x,
     '--tt-eje-y': SPINDLE_MM.y,
-    '--tt-pivote-x': pivot.x,
-    '--tt-pivote-y': pivot.y,
+    '--tt-pivote-x': PIVOT_STAGE_MM.x,
+    '--tt-pivote-y': PIVOT_STAGE_MM.y,
     '--tt-soporte-x': restPost.x,
     '--tt-soporte-y': restPost.y,
-    '--tt-soporte-ang': armScreenAngleDeg(REST_RADIUS_MM),
-    '--tt-cue-x': pivot.x + CUE_OFFSET_MM.x,
-    '--tt-cue-y': pivot.y + CUE_OFFSET_MM.y,
+    '--tt-soporte-ang': restAngle,
+    '--tt-cue-x': PIVOT_STAGE_MM.x + CUE_OFFSET_MM.x,
+    '--tt-cue-y': PIVOT_STAGE_MM.y + CUE_OFFSET_MM.y,
     '--tt-disco-mm': 2 * PLATTER_RADIUS_MM,
   };
-  for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value.toFixed(3));
+  for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value.toFixed(4));
 }
 
 function buildDom(id: string): Dom {
@@ -570,7 +664,7 @@ function buildDom(id: string): Dom {
     ...controls.nodes,
     ...lid.nodes,
   ]);
-  const root = h('section', 'tt es-encendido es-tapa-abierta es-sin-disco es-en-soporte es-levantado', {
+  const root = h('section', 'tt tt-es-encendido tt-es-tapa-abierta tt-es-sin-disco tt-es-en-soporte tt-es-levantado', {
     'data-test': 'tt',
     'aria-label': 'Tocadiscos',
   });
@@ -579,7 +673,9 @@ function buildDom(id: string): Dom {
 
   return {
     root,
+    stage,
     platter: platter.platter,
+    mat: platter.mat,
     disc: platter.disc,
     discCanvas: platter.discCanvas,
     discShadow: platter.discShadow,
@@ -610,7 +706,7 @@ function buildDom(id: string): Dom {
 }
 
 // ---------------------------------------------------------------------------
-// La vista
+// Punteros → mm
 // ---------------------------------------------------------------------------
 
 /** Referencia para convertir coordenadas de puntero (px de cliente) a mm respecto al eje. */
@@ -620,21 +716,29 @@ interface SpindleRef {
   pxPerMm: number;
 }
 
+function toMm(ref: SpindleRef, ev: PointerEvent): PointMm {
+  return { x: (ev.clientX - ref.cx) / ref.pxPerMm, y: (ev.clientY - ref.cy) / ref.pxPerMm };
+}
+
+// ---------------------------------------------------------------------------
+// La vista
+// ---------------------------------------------------------------------------
+
 export function createTurntableView(actions: TurntableActions): TurntableView {
   instanceCounter += 1;
   const dom = buildDom(`tt${instanceCounter}`);
   const { root } = dom;
 
-  // ----- escala -----------------------------------------------------------
   let pxPerMm = DEFAULT_PX_PER_MM;
   let dpr = window.devicePixelRatio || 1;
   let measured = false;
   let currentFormat: Format | null = null;
-  const resizeListeners = new Set<() => void>();
-  const transforms = new Map<HTMLElement, string>();
   let lastCanvas: HTMLCanvasElement | null = null;
   let lastFrame: TurntableFrame | null = null;
   let reducedMotion = false;
+  const resizeListeners = new Set<() => void>();
+  const transforms = new Map<HTMLElement, string>();
+  const classes = new Map<string, boolean>();
 
   function setTransform(el: HTMLElement, value: string): void {
     if (transforms.get(el) === value) return;
@@ -642,12 +746,27 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     el.style.transform = value;
   }
 
+  function setClass(name: string, on: boolean): void {
+    if (classes.get(name) === on) return;
+    classes.set(name, on);
+    root.classList.toggle(name, on);
+  }
+
+  function lidOpen(): boolean {
+    return lastFrame?.state.lidOpen ?? true;
+  }
+
+  // ----- escala -----------------------------------------------------------
   function notifyResize(): void {
     for (const cb of Array.from(resizeListeners)) cb();
   }
 
+  function discRadiusMm(): number {
+    return currentFormat ? discGeometry(currentFormat).radiusMm : PLATTER_RADIUS_MM;
+  }
+
   function applyDiscSize(): void {
-    const radius = currentFormat ? discGeometry(currentFormat).radiusMm : PLATTER_RADIUS_MM;
+    const radius = discRadiusMm();
     const css = `${(2 * radius * pxPerMm).toFixed(3)}px`;
     dom.discCanvas.style.width = css;
     dom.discCanvas.style.height = css;
@@ -702,30 +821,22 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
   const motionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
   const onMotionChange = (): void => {
     reducedMotion = motionQuery?.matches === true;
-    root.classList.toggle('es-movimiento-reducido', reducedMotion);
+    setClass('tt-es-movimiento-reducido', reducedMotion);
   };
   motionQuery?.addEventListener('change', onMotionChange);
   onMotionChange();
 
-  // ----- punteros → mm ------------------------------------------------------
   function spindleRef(): SpindleRef {
-    const rect = dom.platter.getBoundingClientRect();
+    // La zona táctil del plato no gira: su caja es exactamente el círculo de 12".
+    const rect = dom.platterTouch.getBoundingClientRect();
     const scale = rect.width > 0 ? rect.width / (2 * PLATTER_RADIUS_MM) : pxPerMm;
     return { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, pxPerMm: scale };
-  }
-
-  function toMm(ref: SpindleRef, ev: PointerEvent): PointMm {
-    return { x: (ev.clientX - ref.cx) / ref.pxPerMm, y: (ev.clientY - ref.cy) / ref.pxPerMm };
   }
 
   function currentRadius(): number {
     const t = lastFrame?.state.tonearm;
     if (!t || t.onRest) return REST_RADIUS_MM;
     return clampRadius(t.radiusMm);
-  }
-
-  function hasDisc(): boolean {
-    return lastFrame?.discCanvas != null && lastFrame.discFormat != null;
   }
 
   // ----- arrastre del cabezal ----------------------------------------------
@@ -745,15 +856,16 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
 
     function finish(radius: number): void {
       if (pointerId === null) return;
-      releasePointer(headshell, pointerId);
+      const id = pointerId;
       pointerId = null;
       ref = null;
-      root.classList.remove('es-arrastrando');
+      releasePointer(headshell, id);
+      setClass('tt-es-arrastrando', false);
       actions.moveTonearm(radius > REST_THRESHOLD_MM ? 'rest' : radius, false);
     }
 
     headshell.addEventListener('pointerdown', (ev) => {
-      if (!isPrimaryButton(ev) || pointerId !== null) return;
+      if (!isPrimaryButton(ev) || pointerId !== null || !lidOpen()) return;
       ev.preventDefault();
       ev.stopPropagation();
       pointerId = ev.pointerId;
@@ -765,7 +877,7 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
       // El punto de agarre no es la aguja: se conserva el desfase para que el brazo no salte.
       grabOffset = pointerArmAngle(p.x, p.y, PIVOT_MM) - armAngleForRadius(start);
       lastRadius = start;
-      root.classList.add('es-arrastrando');
+      setClass('tt-es-arrastrando', true);
       actions.moveTonearm(start, true);
     });
     headshell.addEventListener('pointermove', (ev) => {
@@ -774,22 +886,19 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
       actions.moveTonearm(radiusAt(ev), true);
     });
     headshell.addEventListener('pointerup', (ev) => {
-      if (ev.pointerId !== pointerId) return;
-      finish(radiusAt(ev));
+      if (ev.pointerId === pointerId) finish(radiusAt(ev));
     });
     headshell.addEventListener('pointercancel', (ev) => {
-      if (ev.pointerId !== pointerId) return;
-      finish(lastRadius);
+      if (ev.pointerId === pointerId) finish(lastRadius);
     });
     headshell.addEventListener('lostpointercapture', (ev) => {
-      if (ev.pointerId !== pointerId) return;
-      finish(lastRadius);
+      if (ev.pointerId === pointerId) finish(lastRadius);
     });
   }
 
   // ----- mano sobre el plato (scratch) y cepillo ----------------------------
-  function wirePlatterDrag(): void {
-    const { platterTouch, brushSprite } = dom;
+  function wirePlatterDrag(): { tick(now: number): void } {
+    const { platterTouch, brushSprite, stage } = dom;
     let pointerId: number | null = null;
     let mode: 'scratch' | 'brush' = 'scratch';
     let ref: SpindleRef | null = null;
@@ -798,6 +907,8 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     let lastX = 0;
     let lastY = 0;
     let travel = 0;
+    let strokeStart = 0;
+    let handIdle = false;
     const samples: number[] = [];
 
     function angleOf(ev: PointerEvent): number {
@@ -805,16 +916,23 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
       return Math.atan2(ev.clientY - ref.cy, ev.clientX - ref.cx) / DEG_TO_RAD;
     }
 
+    function overDisc(ev: PointerEvent): boolean {
+      if (!ref || !hasDiscIn(lastFrame)) return false;
+      const p = toMm(ref, ev);
+      return Math.hypot(p.x, p.y) <= discRadiusMm();
+    }
+
     function moveSprite(ev: PointerEvent): void {
-      const rect = root.getBoundingClientRect();
+      // El sprite se posiciona dentro del escenario, que puede estar centrado con márgenes en la raíz.
+      const rect = stage.getBoundingClientRect();
       setTransform(brushSprite, `translate(${(ev.clientX - rect.left).toFixed(1)}px, ${(ev.clientY - rect.top).toFixed(1)}px)`);
     }
 
     function scratchMove(ev: PointerEvent): void {
       const now = performance.now();
       const dt = (now - lastTime) / 1000;
-      const angle = angleOf(ev);
       if (dt <= 0) return;
+      const angle = angleOf(ev);
       let delta = angle - lastAngle;
       if (delta > 180) delta -= 360;
       if (delta < -180) delta += 360;
@@ -823,49 +941,56 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
       const avg = samples.reduce((acc, v) => acc + v, 0) / samples.length;
       lastAngle = angle;
       lastTime = now;
+      handIdle = false;
       actions.handPlatter(avg);
     }
 
     function brushMove(ev: PointerEvent): void {
       const now = performance.now();
-      const dt = Math.max(1e-3, (now - lastTime) / 1000);
       const seg = Math.hypot(ev.clientX - lastX, ev.clientY - lastY);
       lastX = ev.clientX;
       lastY = ev.clientY;
-      lastTime = now;
       moveSprite(ev);
-      if (!hasDisc()) return;
+      // Solo cuenta el recorrido sobre el disco: frotar el tapete no limpia nada.
+      if (!overDisc(ev)) return;
       travel += seg;
       if (travel < BRUSH_STEP_PX) return;
-      travel -= BRUSH_STEP_PX;
-      const strength = Math.min(1, Math.max(0, seg / dt / BRUSH_FULL_SPEED_PX_PER_SEC));
-      actions.brushStroke(strength);
+      const elapsed = Math.max(1, now - strokeStart) / 1000;
+      const strength = Math.min(1, Math.max(0, travel / elapsed / BRUSH_FULL_SPEED_PX_PER_SEC));
+      const strokes = Math.min(BRUSH_MAX_STROKES_PER_EVENT, Math.floor(travel / BRUSH_STEP_PX));
+      travel %= BRUSH_STEP_PX;
+      strokeStart = now;
+      for (let i = 0; i < strokes; i += 1) actions.brushStroke(strength);
     }
 
     function finish(): void {
       if (pointerId === null) return;
-      releasePointer(platterTouch, pointerId);
+      const id = pointerId;
       pointerId = null;
       ref = null;
+      releasePointer(platterTouch, id);
+      setClass('tt-es-frotando', false);
       if (mode === 'scratch') actions.handPlatter(null);
-      root.classList.remove('es-frotando');
     }
 
     platterTouch.addEventListener('pointerdown', (ev) => {
-      if (!isPrimaryButton(ev) || pointerId !== null) return;
+      if (!isPrimaryButton(ev) || pointerId !== null || !lidOpen()) return;
       ev.preventDefault();
       pointerId = ev.pointerId;
       mode = lastFrame?.tool === 'brush' ? 'brush' : 'scratch';
       ref = spindleRef();
       capturePointer(platterTouch, ev.pointerId);
       lastTime = performance.now();
+      strokeStart = lastTime;
       lastAngle = angleOf(ev);
       lastX = ev.clientX;
       lastY = ev.clientY;
       travel = 0;
       samples.length = 0;
-      root.classList.add('es-frotando');
+      handIdle = true;
+      setClass('tt-es-frotando', true);
       if (mode === 'brush') moveSprite(ev);
+      // Posar la mano sujeta el plato: velocidad 0 hasta que se mueva.
       else actions.handPlatter(0);
     });
     platterTouch.addEventListener('pointermove', (ev) => {
@@ -875,12 +1000,13 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
         else scratchMove(ev);
         return;
       }
-      if (lastFrame?.tool === 'brush' && ev.pointerType === 'mouse') moveSprite(ev);
+      if (pointerId === null) moveSprite(ev);
     });
-    platterTouch.addEventListener('pointerenter', () => {
-      if (lastFrame?.tool === 'brush') root.classList.add('es-sobre-plato');
+    platterTouch.addEventListener('pointerenter', (ev) => {
+      setClass('tt-es-sobre-plato', true);
+      moveSprite(ev);
     });
-    platterTouch.addEventListener('pointerleave', () => root.classList.remove('es-sobre-plato'));
+    platterTouch.addEventListener('pointerleave', () => setClass('tt-es-sobre-plato', false));
     platterTouch.addEventListener('pointerup', (ev) => {
       if (ev.pointerId === pointerId) finish();
     });
@@ -890,6 +1016,16 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     platterTouch.addEventListener('lostpointercapture', (ev) => {
       if (ev.pointerId === pointerId) finish();
     });
+
+    return {
+      tick(now: number): void {
+        if (pointerId === null || mode !== 'scratch' || handIdle) return;
+        if (now - lastTime < HAND_IDLE_MS) return;
+        handIdle = true;
+        samples.length = 0;
+        actions.handPlatter(0);
+      },
+    };
   }
 
   // ----- botones y deslizadores ----------------------------------------------
@@ -908,16 +1044,25 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
   }
 
   // ----- teclado --------------------------------------------------------------
+  function stepTonearm(deltaMm: number): void {
+    const next = currentRadius() + deltaMm;
+    actions.moveTonearm(next > REST_THRESHOLD_MM ? 'rest' : Math.max(MIN_RADIUS_MM, next), false);
+  }
+
   function onArmKey(ev: KeyboardEvent): void {
-    const r = currentRadius();
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
     switch (ev.key) {
-      case 'ArrowRight': {
-        const next = r + KEY_STEP_MM;
-        actions.moveTonearm(next > REST_THRESHOLD_MM ? 'rest' : next, false);
+      case 'ArrowRight':
+        stepTonearm(KEY_STEP_MM);
         break;
-      }
       case 'ArrowLeft':
-        actions.moveTonearm(Math.max(MIN_RADIUS_MM, r - KEY_STEP_MM), false);
+        stepTonearm(-KEY_STEP_MM);
+        break;
+      case 'PageUp':
+        stepTonearm(PAGE_STEP_MM);
+        break;
+      case 'PageDown':
+        stepTonearm(-PAGE_STEP_MM);
         break;
       case 'ArrowUp':
         actions.setCue(true);
@@ -926,10 +1071,12 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
         actions.setCue(false);
         break;
       case 'Home':
-        actions.moveTonearm('rest', false);
+        // Como en cualquier slider: Inicio lleva al valor mínimo (el surco interior)…
+        actions.moveTonearm(MIN_RADIUS_MM, false);
         break;
       case 'End':
-        actions.moveTonearm(MIN_RADIUS_MM, false);
+        // …y Fin al máximo (el soporte).
+        actions.moveTonearm('rest', false);
         break;
       default:
         return;
@@ -938,7 +1085,7 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
   }
 
   const onDocumentKey = (ev: KeyboardEvent): void => {
-    if (ev.key !== ' ' || ev.repeat || ev.defaultPrevented) return;
+    if (ev.key !== ' ' || ev.repeat || ev.defaultPrevented || !root.isConnected) return;
     if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
     if (isFormControl(document.activeElement) || isFormControl(ev.target as Element | null)) return;
     ev.preventDefault();
@@ -948,12 +1095,12 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
   dom.arm.addEventListener('keydown', onArmKey);
   document.addEventListener('keydown', onDocumentKey);
   wireTonearmDrag();
-  wirePlatterDrag();
+  const platterDrag = wirePlatterDrag();
   wireControls();
 
   // ----- update ---------------------------------------------------------------
   function updateDisc(frame: TurntableFrame): void {
-    const present = frame.discCanvas !== null && frame.discFormat !== null;
+    const present = hasDiscIn(frame);
     if (frame.discFormat !== currentFormat) {
       currentFormat = frame.discFormat;
       applyDiscSize();
@@ -966,7 +1113,7 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     setHidden(dom.discShadow, !present);
     setHidden(dom.shine, !present || !frame.fancy);
     setHidden(dom.adapter, !frame.state.adapter45);
-    root.classList.toggle('es-sin-disco', !present);
+    setClass('tt-es-sin-disco', !present);
   }
 
   function updatePlatter(frame: TurntableFrame): void {
@@ -974,10 +1121,12 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     const rad = deg * DEG_TO_RAD;
     const rot = `rotate(${deg.toFixed(2)}deg)`;
     setTransform(dom.platter, rot);
-    if (frame.discCanvas === null || frame.discFormat === null) return;
+    setTransform(dom.mat, rot);
+    if (!hasDiscIn(frame)) return;
 
     const amp = reducedMotion ? 0 : 1;
     const orbit = frame.discHole === 'large' && !frame.state.adapter45;
+    const wobble = Math.min(1, Math.max(0, frame.wobble || 0));
     let tx = 0;
     let ty = 0;
     let sy = 1;
@@ -986,11 +1135,14 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
       tx = r * Math.cos(rad);
       ty = r * Math.sin(rad);
     } else {
-      sy = 1 + 0.01 * frame.wobble * amp * Math.sin(rad);
+      sy = 1 + 0.01 * wobble * amp * Math.sin(rad);
     }
-    setTransform(dom.disc, `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scaleY(${sy.toFixed(4)}) ${rot}`);
+    const shift = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px)`;
+    setTransform(dom.disc, `${shift} scaleY(${sy.toFixed(4)}) ${rot}`);
+    // El brillo no gira, pero acompaña al disco descentrado para que el recorte coincida con él.
+    setTransform(dom.shine, shift);
 
-    const sway = orbit ? 0 : SHADOW_WOBBLE_MM * frame.wobble * amp * pxPerMm;
+    const sway = orbit ? 0 : SHADOW_WOBBLE_MM * wobble * amp * pxPerMm;
     const sx = DISC_SHADOW_MM.x * pxPerMm + tx + sway * Math.cos(rad);
     const syPx = DISC_SHADOW_MM.y * pxPerMm + ty + sway * Math.sin(rad);
     setTransform(dom.discShadow, `translate(${sx.toFixed(2)}px, ${syPx.toFixed(2)}px)`);
@@ -1000,25 +1152,25 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     const t = frame.state.tonearm;
     const radius = t.onRest ? REST_RADIUS_MM : clampRadius(t.radiusMm);
     setTransform(dom.arm, `rotate(${armScreenAngleDeg(radius).toFixed(3)}deg)`);
-    root.classList.toggle('es-levantado', t.lifted);
-    root.classList.toggle('es-en-soporte', t.onRest);
-    root.classList.toggle('es-en-surco', frame.stylusInGroove);
+    setClass('tt-es-levantado', t.lifted);
+    setClass('tt-es-en-soporte', t.onRest);
+    setClass('tt-es-en-surco', frame.stylusInGroove);
     setAttr(dom.arm, 'aria-valuenow', String(Math.round(radius)));
-    setAttr(dom.arm, 'aria-valuetext', describeArm(frame));
+    setAttr(dom.arm, 'aria-valuetext', describeTonearm(frame));
     setPressed(dom.cue, t.lifted);
   }
 
   function updateControls(frame: TurntableFrame): void {
     const s = frame.state;
-    const present = frame.discCanvas !== null && frame.discFormat !== null;
+    const present = hasDiscIn(frame);
     setPressed(dom.start, s.motor);
     setPressed(dom.power, s.power);
     for (const rpm of RPMS) setPressed(dom.speed[rpm], s.speed === rpm);
     const pitchText = formatPitch(s.pitchPercent);
-    setRangeValue(dom.pitch, String(s.pitchPercent));
+    setRangeValue(dom.pitch, s.pitchPercent, PITCH_STEP);
     setAttr(dom.pitch, 'aria-valuetext', pitchText);
     setText(dom.pitchReadout, pitchText);
-    setRangeValue(dom.volume, s.volume.toFixed(2));
+    setRangeValue(dom.volume, s.volume, VOLUME_STEP);
     setPressed(dom.adapterToggle, s.adapter45);
     setPressed(dom.lidToggle, !s.lidOpen);
     setPressed(dom.brushToggle, frame.tool === 'brush');
@@ -1026,22 +1178,22 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     setDisabled(dom.flip, !present);
     setHidden(dom.lidBlocker, s.lidOpen);
     setHidden(dom.brushSprite, frame.tool !== 'brush');
-    root.classList.toggle('es-encendido', s.power);
-    root.classList.toggle('es-motor', s.motor);
-    root.classList.toggle('es-tapa-abierta', s.lidOpen);
-    root.classList.toggle('es-cepillo', frame.tool === 'brush');
-    root.classList.toggle('es-brillo', frame.fancy);
-    root.classList.toggle('es-girando', Math.abs(frame.actualRpm) > 0.5);
+    setClass('tt-es-encendido', s.power);
+    setClass('tt-es-motor', s.motor);
+    setClass('tt-es-tapa-abierta', s.lidOpen);
+    setClass('tt-es-cepillo', frame.tool === 'brush');
+    setClass('tt-es-brillo', frame.fancy);
+    setClass('tt-es-girando', Math.abs(frame.actualRpm) > 0.5);
   }
 
   function updateDisplay(frame: TurntableFrame): void {
-    const present = frame.discCanvas !== null && frame.discFormat !== null;
     if (!frame.state.power) {
       setText(dom.displayTitle, '');
       setText(dom.displaySide, '');
       setText(dom.displayTime, '');
       return;
     }
+    const present = hasDiscIn(frame);
     const np = frame.nowPlaying;
     setText(dom.displayTitle, np ? `${np.artist} – ${np.title}` : present ? 'Sin canción' : 'Sin disco');
     setText(dom.displaySide, present ? (frame.sideName ?? '') : '');
@@ -1056,6 +1208,7 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     updateTonearm(frame);
     updateControls(frame);
     updateDisplay(frame);
+    platterDrag.tick(performance.now());
   }
 
   function discSizePx(format: Format): number {

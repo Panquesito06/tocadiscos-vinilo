@@ -5,23 +5,28 @@
   con `--tt-escala` (px CSS por mm), que la vista mide con ResizeObserver.
   Cada medida se escribe como calc(N * var(--mm)); las posiciones que
   dependen de la geometría del brazo (eje, pivote, soporte, palanca) llegan
-  del TypeScript como variables en mm.
+  del TypeScript como variables en mm. A la escala de referencia
+  (≈ 1,066 px/mm) el conjunto ocupa 480 × 420 px y cabe en 560 × 420.
 
   Vista cenital: el plinto se ve desde arriba con su cara frontal debajo;
   lo que hay encima (plato, brazo, controles) es cenital puro, así las
   circunferencias son círculos. Luz cálida desde arriba a la izquierda,
-  sombras hacia abajo-derecha.
+  sombras hacia abajo-derecha. Las sombras nunca van en un elemento que
+  gira: girarían con él.
+
+  Las clases de estado de la raíz llevan el prefijo `tt-es-` para no chocar
+  con las de otros módulos.
 */
 
 .tt {
-  --tt-escala: 1.1;
+  --tt-escala: 1.066;
   --mm: calc(var(--tt-escala) * 1px);
   --tt-eje-x: 175;
   --tt-eje-y: 162;
   --tt-pivote-x: 388;
   --tt-pivote-y: 130;
-  --tt-soporte-x: 258;
-  --tt-soporte-y: 296;
+  --tt-soporte-x: 278;
+  --tt-soporte-y: 290;
   --tt-soporte-ang: 128;
   --tt-cue-x: 376;
   --tt-cue-y: 170;
@@ -29,6 +34,8 @@
   --tt-texto: max(10px, calc(6.4 * var(--mm)));
   --tt-texto-xs: max(9px, calc(5.4 * var(--mm)));
   --tt-cromo: linear-gradient(180deg, var(--aluminio-claro) 0%, var(--aluminio) 55%, var(--aluminio-oscuro) 100%);
+  --tt-canto: color-mix(in srgb, var(--aluminio-oscuro), var(--carbon) 55%);
+  --tt-luz-estrobo: color-mix(in srgb, var(--rojo-emi), var(--kraft-claro) 35%);
 
   position: relative;
   width: 100%;
@@ -46,11 +53,22 @@
 }
 
 .tt-escenario {
+  container: tt-escenario / inline-size;
   position: absolute;
   inset: 0;
   margin: auto;
   width: calc(450 * var(--mm));
   height: calc(394 * var(--mm));
+}
+
+/* Círculos centrados en el eje; cada uno fija su radio en mm con --r. */
+.tt-circulo {
+  position: absolute;
+  left: calc((var(--tt-eje-x) - var(--r)) * var(--mm));
+  top: calc((var(--tt-eje-y) - var(--r)) * var(--mm));
+  width: calc(2 * var(--r) * var(--mm));
+  height: calc(2 * var(--r) * var(--mm));
+  border-radius: 50%;
 }
 
 /* ---------------------------------------------------------------- plinto */
@@ -89,6 +107,18 @@
     inset calc(-1 * var(--mm)) calc(-1 * var(--mm)) 0 rgba(0, 0, 0, 0.4),
     var(--sombra-objeto),
     calc(8 * var(--mm)) calc(14 * var(--mm)) calc(22 * var(--mm)) rgba(0, 0, 0, 0.35);
+}
+
+/* Bisel del canto: una arista clara arriba a la izquierda y oscura abajo a la derecha. */
+.tt-plinto::before {
+  content: '';
+  position: absolute;
+  inset: calc(3.5 * var(--mm));
+  border-radius: calc(3.5 * var(--mm));
+  box-shadow:
+    calc(-0.6 * var(--mm)) calc(-0.6 * var(--mm)) 0 rgba(0, 0, 0, 0.16),
+    calc(0.5 * var(--mm)) calc(0.5 * var(--mm)) 0 rgba(255, 255, 255, 0.06);
+  pointer-events: none;
 }
 
 .tt-frente {
@@ -160,31 +190,64 @@
 
 /* ----------------------------------------------------------------- plato */
 
-.tt-plato-pozo,
-.tt-plato,
-.tt-disco,
-.tt-brillo,
-.tt-plato-toque {
-  position: absolute;
-  left: calc((var(--tt-eje-x) - 151) * var(--mm));
-  top: calc((var(--tt-eje-y) - 151) * var(--mm));
-  width: calc(302 * var(--mm));
-  height: calc(302 * var(--mm));
-  border-radius: 50%;
-}
-
 .tt-plato-pozo {
-  left: calc((var(--tt-eje-x) - 155) * var(--mm));
-  top: calc((var(--tt-eje-y) - 155) * var(--mm));
-  width: calc(310 * var(--mm));
-  height: calc(310 * var(--mm));
-  background: radial-gradient(circle, #151517 0, #151517 calc(148 * var(--mm)), #0a0a0b 100%);
+  --r: 158;
+  background: radial-gradient(
+    circle,
+    var(--vinilo) 0,
+    var(--vinilo) calc(150 * var(--mm)),
+    color-mix(in srgb, var(--vinilo), black 45%) 100%
+  );
   box-shadow:
     inset 0 calc(2 * var(--mm)) calc(5 * var(--mm)) rgba(0, 0, 0, 0.75),
     0 calc(1 * var(--mm)) 0 rgba(255, 255, 255, 0.07);
 }
 
+/* Sombra del plato sobre el pozo: va en un elemento fijo para que no gire. */
+.tt-plato-pozo::after {
+  content: '';
+  position: absolute;
+  inset: calc(3 * var(--mm));
+  border-radius: 50%;
+  box-shadow: calc(1.4 * var(--mm)) calc(2.4 * var(--mm)) calc(3.5 * var(--mm)) rgba(0, 0, 0, 0.7);
+}
+
+/* Canto del plato con la fila exterior de marcas (180 puntos: 33⅓ rpm a 60 Hz). Gira. */
 .tt-plato {
+  --r: 155;
+  background:
+    radial-gradient(
+      circle,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) calc(153.6 * var(--mm)),
+      rgba(255, 255, 255, 0.16) calc(154.2 * var(--mm)),
+      rgba(0, 0, 0, 0.45) calc(155 * var(--mm))
+    ),
+    repeating-conic-gradient(from 0deg, var(--aluminio-claro) 0deg 0.85deg, var(--tt-canto) 0.85deg 2deg);
+  will-change: transform;
+}
+
+/* Fila interior de marcas (216 puntos: 33⅓ rpm a 50 Hz). Gira con el canto. */
+.tt-estrobo {
+  position: absolute;
+  inset: calc(2 * var(--mm));
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) calc(152.2 * var(--mm)),
+      rgba(0, 0, 0, 0.35) calc(153 * var(--mm))
+    ),
+    repeating-conic-gradient(from 0.4deg, var(--aluminio) 0deg 0.7deg, var(--tt-canto) 0.7deg calc(360deg / 216));
+}
+
+/*
+  Cara del plato: aluminio torneado. El reflejo de un torneado concéntrico
+  es una "pajarita" fija respecto a la luz, así que esta capa no gira.
+*/
+.tt-plato-cara {
+  --r: 151;
   background:
     radial-gradient(
       circle,
@@ -192,44 +255,39 @@
       rgba(0, 0, 0, 0) calc(141 * var(--mm)),
       rgba(0, 0, 0, 0.22) calc(142.5 * var(--mm)),
       rgba(0, 0, 0, 0) calc(144 * var(--mm)),
-      rgba(255, 255, 255, 0.08) calc(149 * var(--mm)),
+      rgba(255, 255, 255, 0.1) calc(149 * var(--mm)),
       rgba(0, 0, 0, 0.3) calc(151 * var(--mm))
     ),
-    repeating-conic-gradient(
-      from 0deg,
-      rgba(255, 255, 255, 0.11) 0deg 0.5deg,
-      rgba(0, 0, 0, 0.07) 0.5deg 1.3deg,
-      rgba(255, 255, 255, 0.025) 1.3deg 2.1deg
+    repeating-radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.06) 0,
+      rgba(255, 255, 255, 0.06) calc(0.25 * var(--mm)),
+      rgba(0, 0, 0, 0.05) calc(0.25 * var(--mm)),
+      rgba(0, 0, 0, 0.05) calc(0.6 * var(--mm))
     ),
     conic-gradient(
       from 25deg,
       var(--aluminio-claro) 0%,
-      var(--aluminio) 16%,
-      var(--aluminio-oscuro) 31%,
-      var(--aluminio-claro) 47%,
-      var(--aluminio) 63%,
-      var(--aluminio-oscuro) 80%,
+      var(--aluminio) 12%,
+      var(--aluminio-oscuro) 25%,
+      var(--aluminio) 38%,
+      var(--aluminio-claro) 50%,
+      var(--aluminio) 62%,
+      var(--aluminio-oscuro) 75%,
+      var(--aluminio) 88%,
       var(--aluminio-claro) 100%
     );
-  box-shadow:
-    0 calc(2 * var(--mm)) calc(4 * var(--mm)) rgba(0, 0, 0, 0.55),
-    inset 0 0 0 calc(0.8 * var(--mm)) rgba(255, 255, 255, 0.3);
-  will-change: transform;
+  box-shadow: inset 0 0 0 calc(0.6 * var(--mm)) rgba(255, 255, 255, 0.28);
 }
 
-.tt-estrobo {
-  position: absolute;
-  inset: calc(2 * var(--mm));
-  border-radius: 50%;
-  background: repeating-conic-gradient(from 0deg, var(--fieltro) 0deg 1.5deg, rgba(0, 0, 0, 0) 1.5deg 3deg);
-}
-
+/* Tapete de fieltro: textura simétrica (no delata el giro) y una marca impresa que sí lo delata. */
 .tt-tapete {
-  position: absolute;
-  inset: calc(9 * var(--mm));
-  border-radius: 50%;
+  --r: 142;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(26 * var(--mm));
   background:
-    radial-gradient(circle at 42% 36%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 60%),
     repeating-radial-gradient(
       circle,
       rgba(255, 255, 255, 0.025) 0,
@@ -237,8 +295,59 @@
       rgba(0, 0, 0, 0) calc(0.8 * var(--mm)),
       rgba(0, 0, 0, 0) calc(3.2 * var(--mm))
     ),
-    radial-gradient(circle, #343339 0, var(--fieltro) 55%, #232226 100%);
+    radial-gradient(
+      circle,
+      color-mix(in srgb, var(--fieltro), white 6%) 0,
+      var(--fieltro) 55%,
+      color-mix(in srgb, var(--fieltro), black 22%) 100%
+    );
   box-shadow: inset 0 0 calc(3 * var(--mm)) rgba(0, 0, 0, 0.55);
+  will-change: transform;
+}
+
+.tt-tapete-marca {
+  font-size: calc(9 * var(--mm));
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.07);
+  white-space: nowrap;
+}
+
+/* Lámpara estroboscópica: ilumina el canto delante a la izquierda cuando hay corriente. */
+.tt-estrobo-luz {
+  --r: 158;
+  background: radial-gradient(
+    circle at 15.6% 84.4%,
+    color-mix(in srgb, var(--tt-luz-estrobo) 70%, transparent) 0,
+    color-mix(in srgb, var(--tt-luz-estrobo) 22%, transparent) calc(14 * var(--mm)),
+    rgba(0, 0, 0, 0) calc(30 * var(--mm))
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-media) var(--curva);
+}
+
+.tt.tt-es-encendido .tt-estrobo-luz {
+  opacity: 1;
+}
+
+/* Carcasa de la lámpara, sobre el plinto, fuera del canto. */
+.tt-estrobo-luz::before {
+  content: '';
+  position: absolute;
+  left: calc(34.6 * var(--mm));
+  top: calc(269.4 * var(--mm));
+  width: calc(12 * var(--mm));
+  height: calc(12 * var(--mm));
+  border-radius: calc(2.5 * var(--mm));
+  background:
+    radial-gradient(circle at 70% 30%, var(--rojo-emi-oscuro) 0, var(--carbon) 70%),
+    var(--carbon);
+  box-shadow:
+    calc(1 * var(--mm)) calc(1.6 * var(--mm)) calc(2 * var(--mm)) rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* ----------------------------------------------------------------- disco */
@@ -256,6 +365,7 @@
 }
 
 .tt-disco {
+  --r: 151;
   transform-origin: 50% 50%;
   will-change: transform;
 }
@@ -280,7 +390,7 @@
   top: calc((var(--tt-eje-y) - 3.62) * var(--mm));
   width: calc(7.24 * var(--mm));
   height: calc(7.24 * var(--mm));
-  background: radial-gradient(circle at 35% 30%, #ffffff 0, var(--aluminio-claro) 25%, var(--aluminio) 60%, var(--aluminio-oscuro) 100%);
+  background: radial-gradient(circle at 35% 30%, white 0, var(--aluminio-claro) 25%, var(--aluminio) 60%, var(--aluminio-oscuro) 100%);
   box-shadow: calc(0.6 * var(--mm)) calc(1 * var(--mm)) calc(1.5 * var(--mm)) rgba(0, 0, 0, 0.6);
 }
 
@@ -315,6 +425,7 @@
 }
 
 .tt-brillo {
+  --r: 151;
   background:
     radial-gradient(ellipse at 28% 22%, rgba(255, 255, 255, 0.4) 0, rgba(255, 255, 255, 0.12) 22%, rgba(255, 255, 255, 0) 46%),
     linear-gradient(
@@ -330,21 +441,19 @@
 }
 
 .tt-plato-toque {
+  --r: 151;
   touch-action: none;
   cursor: grab;
   z-index: 3;
 }
 
-.tt.es-frotando .tt-plato-toque {
+.tt.tt-es-frotando .tt-plato-toque {
   cursor: grabbing;
 }
 
-.tt.es-cepillo .tt-plato-toque {
+/* Con el cepillo, el propio sprite hace de cursor sobre el plato. */
+.tt.tt-es-cepillo .tt-plato-toque {
   cursor: none;
-}
-
-.tt.es-cepillo:not(.es-sobre-plato):not(.es-frotando) .tt-plato-toque {
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="20" viewBox="0 0 32 20"><rect x="2" y="7" width="16" height="6" rx="2" fill="%23c9a66b"/><rect x="17" y="4" width="13" height="12" rx="1.5" fill="%231c1b19"/></svg>') 16 10, crosshair;
 }
 
 /* ----------------------------------------------------------------- brazo */
@@ -376,51 +485,48 @@
   z-index: 4;
 }
 
-.tt-pivote::before,
-.tt-pivote::after {
+/* Cuatro tornillos de la base: uno dibujado y tres copias con box-shadow. */
+.tt-pivote::before {
   content: '';
   position: absolute;
+  left: calc(4.5 * var(--mm));
+  top: calc(4.5 * var(--mm));
   width: calc(3 * var(--mm));
   height: calc(3 * var(--mm));
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, var(--aluminio-claro), var(--aluminio-oscuro));
+  background:
+    linear-gradient(45deg, rgba(0, 0, 0, 0) 44%, rgba(0, 0, 0, 0.45) 44%, rgba(0, 0, 0, 0.45) 56%, rgba(0, 0, 0, 0) 56%),
+    radial-gradient(circle at 40% 35%, var(--aluminio-claro), var(--aluminio-oscuro));
   box-shadow:
     calc(38 * var(--mm)) 0 0 var(--aluminio-oscuro),
     0 calc(38 * var(--mm)) 0 var(--aluminio-oscuro),
     calc(38 * var(--mm)) calc(38 * var(--mm)) 0 var(--aluminio-oscuro);
 }
 
-.tt-pivote::before {
-  left: calc(4.5 * var(--mm));
-  top: calc(4.5 * var(--mm));
-}
-
-.tt-pivote::after {
-  display: none;
-}
-
 .tt-soporte {
   position: absolute;
-  left: calc((var(--tt-soporte-x) - 7) * var(--mm));
-  top: calc((var(--tt-soporte-y) - 7) * var(--mm));
-  width: calc(14 * var(--mm));
-  height: calc(14 * var(--mm));
+  left: calc((var(--tt-soporte-x) - 6) * var(--mm));
+  top: calc((var(--tt-soporte-y) - 6) * var(--mm));
+  width: calc(12 * var(--mm));
+  height: calc(12 * var(--mm));
   border-radius: 50%;
   background: radial-gradient(circle at 38% 32%, var(--aluminio-claro), var(--aluminio) 55%, var(--aluminio-oscuro));
   box-shadow: calc(1.5 * var(--mm)) calc(2.5 * var(--mm)) calc(3 * var(--mm)) rgba(0, 0, 0, 0.5);
   z-index: 4;
 }
 
+/* Pinza del soporte: dos uñas a los lados del tubo, alineadas con el brazo en reposo. */
 .tt-soporte-pinza {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(12 * var(--mm));
-  height: calc(9 * var(--mm));
-  margin: calc(-4.5 * var(--mm)) 0 0 calc(-6 * var(--mm));
-  border: calc(1.6 * var(--mm)) solid var(--aluminio-oscuro);
+  width: calc(11 * var(--mm));
+  height: calc(8 * var(--mm));
+  margin: calc(-4 * var(--mm)) 0 0 calc(-5.5 * var(--mm));
+  border: calc(1.5 * var(--mm)) solid var(--aluminio-oscuro);
   border-top-color: transparent;
-  border-radius: 0 0 calc(3 * var(--mm)) calc(3 * var(--mm));
+  border-bottom-color: transparent;
+  border-radius: calc(2 * var(--mm));
   transform: rotate(calc((var(--tt-soporte-ang) - 90) * 1deg));
   box-sizing: border-box;
 }
@@ -452,7 +558,8 @@
   transition: filter var(--dur-media) var(--curva);
 }
 
-.tt.es-levantado .tt-brazo-svg {
+/* Aguja levantada: el brazo sube y su sombra se aleja y se difumina. */
+.tt.tt-es-levantado .tt-brazo-svg {
   filter: drop-shadow(calc(2 * var(--mm)) calc(-9 * var(--mm)) calc(4 * var(--mm)) rgba(0, 0, 0, 0.4));
 }
 
@@ -469,8 +576,8 @@
   cursor: grab;
 }
 
-.tt.es-arrastrando .tt-cabezal,
-.tt.es-arrastrando {
+.tt.tt-es-arrastrando,
+.tt.tt-es-arrastrando .tt-cabezal {
   cursor: grabbing;
 }
 
@@ -532,6 +639,11 @@
   transform: rotate(-32deg);
 }
 
+/* Tapa cerrada: el plato, el brazo y la palanca no reciben punteros. */
+.tt:not(.tt-es-tapa-abierta) :is(.tt-cabezal, .tt-plato-toque, .tt-cue) {
+  pointer-events: none;
+}
+
 /* ------------------------------------------------------------- controles */
 
 .tt-boton {
@@ -554,6 +666,7 @@
   transition: transform var(--dur-rapida) var(--curva), box-shadow var(--dur-rapida) var(--curva);
 }
 
+/* Pulsado o activo: hundido, con la luz rasante dentro. */
 .tt-boton:active,
 .tt-boton[aria-pressed='true'] {
   background: linear-gradient(180deg, var(--aluminio-oscuro) 0%, var(--aluminio) 70%, var(--aluminio) 100%);
@@ -573,26 +686,30 @@
   width: calc(2.4 * var(--mm));
   height: calc(2.4 * var(--mm));
   border-radius: 50%;
-  background: #4a1512;
+  background: color-mix(in srgb, var(--rojo-emi-oscuro), var(--carbon) 55%);
   box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.6);
   transition: background var(--dur-rapida) var(--curva), box-shadow var(--dur-rapida) var(--curva);
 }
 
-.tt.es-encendido .tt-boton[aria-pressed='true'] .tt-led {
+.tt.tt-es-encendido .tt-boton[aria-pressed='true'] .tt-led {
   background: var(--rojo-emi);
-  box-shadow: 0 0 calc(2 * var(--mm)) rgba(209, 48, 42, 0.85);
+  box-shadow: 0 0 calc(2 * var(--mm)) color-mix(in srgb, var(--rojo-emi) 85%, transparent);
 }
 
 .tt-boton-frente {
+  flex: 0 1 auto;
+  min-width: 0;
   padding: calc(0.8 * var(--mm)) calc(2.6 * var(--mm));
   font-size: var(--tt-texto);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tt-encendido {
   position: absolute;
   left: calc(12 * var(--mm));
-  top: calc(328 * var(--mm));
+  top: calc(326 * var(--mm));
   width: calc(20 * var(--mm));
   height: calc(28 * var(--mm));
   display: flex;
@@ -627,7 +744,7 @@
 
 .tt-start {
   position: absolute;
-  left: calc(48 * var(--mm));
+  left: calc(42 * var(--mm));
   top: calc(322 * var(--mm));
   width: calc(32 * var(--mm));
   height: calc(32 * var(--mm));
@@ -650,37 +767,55 @@
   transform: translateY(calc(0.6 * var(--mm)));
 }
 
+/* Motor en marcha: rojo EMI encendido. */
 .tt-start[aria-pressed='true'] {
-  background: radial-gradient(circle at 40% 35%, #ff7d74, var(--rojo-emi) 52%, var(--rojo-emi-oscuro) 100%);
+  background: radial-gradient(
+    circle at 40% 35%,
+    color-mix(in srgb, var(--rojo-emi), white 40%),
+    var(--rojo-emi) 52%,
+    var(--rojo-emi-oscuro) 100%
+  );
   box-shadow:
     0 0 0 calc(2.4 * var(--mm)) var(--aluminio),
     0 0 0 calc(3.2 * var(--mm)) var(--aluminio-oscuro),
     calc(2 * var(--mm)) calc(3 * var(--mm)) calc(5 * var(--mm)) rgba(0, 0, 0, 0.5),
-    0 0 calc(12 * var(--mm)) rgba(209, 48, 42, 0.55),
+    0 0 calc(12 * var(--mm)) color-mix(in srgb, var(--rojo-emi) 55%, transparent),
     inset 0 calc(1 * var(--mm)) calc(2 * var(--mm)) rgba(255, 255, 255, 0.3);
 }
 
-.tt-start-etiqueta {
-  position: absolute;
-  left: calc(44 * var(--mm));
-  top: calc(357 * var(--mm));
-  width: calc(40 * var(--mm));
-  text-align: center;
+.tt-start-etiqueta,
+.tt-velocidad-etiqueta,
+.tt-volumen-etiqueta {
   font-size: var(--tt-texto-xs);
   font-weight: 600;
+  line-height: 1.2;
   color: var(--kraft-claro);
   opacity: 0.85;
   pointer-events: none;
 }
 
+.tt-start-etiqueta {
+  position: absolute;
+  left: calc(38 * var(--mm));
+  top: calc(357 * var(--mm));
+  width: calc(40 * var(--mm));
+  text-align: center;
+}
+
 .tt-velocidad {
   position: absolute;
-  left: calc(94 * var(--mm));
-  top: calc(327 * var(--mm));
+  left: calc(86 * var(--mm));
+  top: calc(326 * var(--mm));
   display: flex;
-  align-items: flex-end;
-  gap: calc(3 * var(--mm));
+  flex-direction: column;
+  align-items: center;
+  gap: calc(1.6 * var(--mm));
   z-index: 5;
+}
+
+.tt-velocidad-botones {
+  display: flex;
+  gap: calc(3 * var(--mm));
 }
 
 .tt-rpm {
@@ -689,42 +824,44 @@
   align-items: center;
   justify-content: center;
   gap: calc(1.2 * var(--mm));
-  width: calc(22 * var(--mm));
-  height: calc(22 * var(--mm));
+  width: calc(21 * var(--mm));
+  height: calc(21 * var(--mm));
   font-weight: 700;
   font-stretch: 112%;
 }
 
-.tt-velocidad-etiqueta {
-  align-self: center;
-  margin-left: calc(1 * var(--mm));
-  font-size: var(--tt-texto-xs);
-  color: var(--kraft-claro);
-  opacity: 0.85;
-}
-
 .tt-pantalla {
   position: absolute;
-  left: calc(178 * var(--mm));
-  top: calc(326 * var(--mm));
-  width: calc(140 * var(--mm));
-  height: calc(32 * var(--mm));
-  padding: calc(3 * var(--mm)) calc(5 * var(--mm));
+  left: calc(164 * var(--mm));
+  top: calc(324 * var(--mm));
+  width: calc(144 * var(--mm));
+  height: calc(36 * var(--mm));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(1 * var(--mm));
+  padding: calc(2 * var(--mm)) calc(5 * var(--mm));
   border-radius: calc(2 * var(--mm));
-  background: linear-gradient(180deg, #0e0e0d, var(--carbon) 60%, #11110f);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--carbon), black 50%),
+    var(--carbon) 60%,
+    color-mix(in srgb, var(--carbon), black 35%)
+  );
   color: var(--kraft-claro);
   font-size: var(--tt-texto);
   line-height: 1.25;
   overflow: hidden;
   box-shadow:
     inset 0 calc(1.5 * var(--mm)) calc(3 * var(--mm)) rgba(0, 0, 0, 0.8),
-    inset 0 0 0 1px rgba(201, 166, 107, 0.15),
+    inset 0 0 0 1px var(--linea-ui),
     0 1px 0 rgba(255, 255, 255, 0.12);
-  text-shadow: 0 0 calc(2 * var(--mm)) rgba(230, 211, 168, 0.35);
+  text-shadow: 0 0 calc(2 * var(--mm)) color-mix(in srgb, var(--kraft-claro) 35%, transparent);
   z-index: 5;
   transition: color var(--dur-media) var(--curva), text-shadow var(--dur-media) var(--curva);
 }
 
+/* Reflejo del cristal de la pantalla. */
 .tt-pantalla::after {
   content: '';
   position: absolute;
@@ -751,36 +888,31 @@
   white-space: nowrap;
 }
 
-.tt:not(.es-encendido) .tt-pantalla {
+.tt:not(.tt-es-encendido) .tt-pantalla {
   color: transparent;
   text-shadow: none;
 }
 
-/* deslizadores: ranura dibujada aparte, el input solo aporta el cursor */
+/* Deslizadores: la ranura se dibuja aparte; el input solo aporta el cursor. */
 
 .tt-volumen-caja {
   position: absolute;
-  left: calc(328 * var(--mm));
-  top: calc(326 * var(--mm));
-  width: calc(72 * var(--mm));
-  height: calc(32 * var(--mm));
+  left: calc(318 * var(--mm));
+  top: calc(324 * var(--mm));
+  width: calc(82 * var(--mm));
+  height: calc(36 * var(--mm));
   z-index: 5;
 }
 
-.tt-volumen-etiqueta,
-.tt-pitch-lectura {
+.tt-volumen-etiqueta {
   display: block;
-  font-size: var(--tt-texto-xs);
-  color: var(--kraft-claro);
-  opacity: 0.85;
-  line-height: 1.2;
 }
 
 .tt-volumen-ranura {
   position: absolute;
-  left: calc(2 * var(--mm));
-  right: calc(2 * var(--mm));
-  top: calc(18 * var(--mm));
+  left: calc(4 * var(--mm));
+  right: calc(4 * var(--mm));
+  top: calc(21 * var(--mm));
   height: calc(3 * var(--mm));
   border-radius: calc(1.5 * var(--mm));
   background: var(--carbon);
@@ -790,67 +922,78 @@
 .tt-volumen {
   position: absolute;
   left: 0;
-  right: 0;
-  top: calc(12 * var(--mm));
+  top: calc(14 * var(--mm));
   width: 100%;
-  height: calc(16 * var(--mm));
+  height: calc(17 * var(--mm));
   margin: 0;
 }
 
 .tt-pitch-caja {
   position: absolute;
-  left: calc(412 * var(--mm));
-  top: calc(186 * var(--mm));
-  width: calc(32 * var(--mm));
-  height: calc(128 * var(--mm));
+  left: calc(410 * var(--mm));
+  top: calc(178 * var(--mm));
+  width: calc(36 * var(--mm));
+  height: calc(136 * var(--mm));
   z-index: 5;
 }
 
 .tt-pitch-lectura {
+  display: block;
   width: 100%;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  padding: calc(0.6 * var(--mm)) 0;
+  padding: calc(0.8 * var(--mm)) 0;
   border-radius: calc(1 * var(--mm));
   background: var(--carbon);
   color: var(--kraft-claro);
+  font-size: var(--tt-texto-xs);
+  font-stretch: 75%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.tt-pitch-escala {
-  position: absolute;
-  left: calc(1 * var(--mm));
-  top: calc(16 * var(--mm));
-  width: calc(7 * var(--mm));
-  height: calc(108 * var(--mm));
-  background:
-    linear-gradient(0deg, rgba(0, 0, 0, 0) calc(50% - 0.6px), var(--rojo-emi) calc(50% - 0.6px), var(--rojo-emi) calc(50% + 0.6px), rgba(0, 0, 0, 0) calc(50% + 0.6px)),
-    repeating-linear-gradient(180deg, var(--kraft-claro) 0, var(--kraft-claro) 1px, rgba(0, 0, 0, 0) 1px, rgba(0, 0, 0, 0) calc(6.75 * var(--mm)));
-  background-size: 100% 100%, calc(3.5 * var(--mm)) 100%;
-  background-repeat: no-repeat;
-  opacity: 0.8;
 }
 
 .tt-pitch-mas,
 .tt-pitch-menos {
   position: absolute;
-  left: calc(1.5 * var(--mm));
+  left: calc(2 * var(--mm));
   font-size: var(--tt-texto-xs);
   color: var(--kraft-claro);
   line-height: 1;
 }
 
 .tt-pitch-mas {
-  top: calc(-7 * var(--mm));
+  top: calc(13 * var(--mm));
 }
 
 .tt-pitch-menos {
-  bottom: calc(-7 * var(--mm));
+  top: calc(124 * var(--mm));
+}
+
+/* Escala: una raya por cada 1 % entre +8 y −8, con el cero en rojo. */
+.tt-pitch-escala {
+  position: absolute;
+  left: calc(3 * var(--mm));
+  top: calc(20 * var(--mm));
+  width: calc(7 * var(--mm));
+  height: calc(100.5 * var(--mm));
+  background:
+    linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0) calc(50% - 0.6px),
+      var(--rojo-emi) calc(50% - 0.6px),
+      var(--rojo-emi) calc(50% + 0.6px),
+      rgba(0, 0, 0, 0) calc(50% + 0.6px)
+    ),
+    repeating-linear-gradient(180deg, var(--kraft-claro) 0, var(--kraft-claro) 1px, rgba(0, 0, 0, 0) 1px, rgba(0, 0, 0, 0) calc(6.25 * var(--mm)));
+  background-size: 100% 100%, calc(3.5 * var(--mm)) 100%;
+  background-repeat: no-repeat;
+  opacity: 0.8;
 }
 
 .tt-pitch-ranura {
   position: absolute;
-  left: calc(19 * var(--mm));
+  left: calc(22 * var(--mm));
   top: calc(20 * var(--mm));
   width: calc(3 * var(--mm));
   height: calc(100 * var(--mm));
@@ -861,9 +1004,9 @@
 
 .tt-pitch {
   position: absolute;
-  left: calc(10 * var(--mm));
+  left: calc(12.5 * var(--mm));
   top: calc(16 * var(--mm));
-  width: calc(21 * var(--mm));
+  width: calc(22 * var(--mm));
   height: calc(108 * var(--mm));
   margin: 0;
   writing-mode: vertical-lr;
@@ -906,16 +1049,11 @@
 .tt-volumen::-webkit-slider-thumb {
   width: calc(8 * var(--mm));
   height: calc(14 * var(--mm));
-  margin-top: calc(-7 * var(--mm));
 }
 
 .tt-volumen::-moz-range-thumb {
   width: calc(8 * var(--mm));
   height: calc(14 * var(--mm));
-}
-
-.tt-volumen::-webkit-slider-runnable-track {
-  height: 0;
 }
 
 .tt-pitch::-webkit-slider-thumb {
@@ -942,46 +1080,44 @@
   left: 0;
   top: 0;
   width: calc(410 * var(--mm));
-  height: calc(318 * var(--mm));
+  height: calc(321 * var(--mm));
   cursor: not-allowed;
   z-index: 10;
 }
 
+/*
+  La tapa cubre la parte superior del plinto (por encima de los mandos
+  frontales). La bisagra está en el borde trasero (arriba) y la tapa abierta
+  gira rotateX(−75deg) hacia atrás. La cámara se sitúa por encima del
+  aparato (perspective-origin arriba): así el borde libre de la tapa abierta
+  asoma unos 45 mm por detrás del plinto, estrechándose al alejarse.
+*/
 .tt-tapa-escena {
   position: absolute;
   left: 0;
   top: 0;
   width: calc(450 * var(--mm));
-  height: calc(318 * var(--mm));
-  /* Cámara delante y encima: así la tapa abierta se alza por detrás del aparato. */
+  height: calc(321 * var(--mm));
   perspective: calc(3600 * var(--mm));
-  perspective-origin: 50% 560%;
+  perspective-origin: 50% -480%;
   pointer-events: none;
   z-index: 11;
-}
-
-.tt-tapa-giro {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
-  transform-style: preserve-3d;
 }
 
 .tt-tapa-lamina {
   position: absolute;
   inset: 0;
   border-radius: calc(5 * var(--mm)) calc(5 * var(--mm)) calc(3 * var(--mm)) calc(3 * var(--mm));
-  border: calc(1.2 * var(--mm)) solid rgba(255, 255, 255, 0.5);
-  background:
-    linear-gradient(
-      160deg,
-      rgba(236, 244, 248, 0.32) 0%,
-      rgba(205, 220, 228, 0.14) 38%,
-      rgba(255, 255, 255, 0.24) 62%,
-      rgba(180, 200, 210, 0.16) 100%
-    );
+  border: calc(1.2 * var(--mm)) solid color-mix(in srgb, var(--aluminio-claro) 50%, transparent);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--aluminio-claro) 30%, transparent) 0%,
+    color-mix(in srgb, var(--aluminio) 12%, transparent) 38%,
+    color-mix(in srgb, var(--aluminio-claro) 22%, transparent) 62%,
+    color-mix(in srgb, var(--aluminio) 14%, transparent) 100%
+  );
   box-shadow:
-    inset 0 0 calc(12 * var(--mm)) rgba(255, 255, 255, 0.28),
+    inset 0 0 calc(12 * var(--mm)) rgba(255, 255, 255, 0.24),
     calc(4 * var(--mm)) calc(8 * var(--mm)) calc(14 * var(--mm)) rgba(0, 0, 0, 0.28);
   transform-origin: 50% 0;
   transform: rotateX(0deg);
@@ -989,21 +1125,22 @@
   backface-visibility: visible;
 }
 
-.tt.es-tapa-abierta .tt-tapa-lamina {
+.tt.tt-es-tapa-abierta .tt-tapa-lamina {
   transform: rotateX(-75deg);
   box-shadow:
-    inset 0 0 calc(12 * var(--mm)) rgba(255, 255, 255, 0.28),
-    0 calc(-6 * var(--mm)) calc(14 * var(--mm)) rgba(0, 0, 0, 0.12);
+    inset 0 0 calc(12 * var(--mm)) rgba(255, 255, 255, 0.24),
+    0 calc(-3 * var(--mm)) calc(10 * var(--mm)) rgba(0, 0, 0, 0.12);
 }
 
+/* Reflejo de la ventana: a la izquierda, de donde viene la luz. */
 .tt-tapa-reflejo {
   position: absolute;
   top: 6%;
-  right: 7%;
+  left: 7%;
   width: 9%;
   height: 80%;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.05) 70%, rgba(255, 255, 255, 0));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.05) 70%, rgba(255, 255, 255, 0));
   filter: blur(calc(1 * var(--mm)));
 }
 
@@ -1051,6 +1188,7 @@
   will-change: transform;
 }
 
+/* Mango de madera clara. */
 .tt-cepillo-sprite::before {
   content: '';
   position: absolute;
@@ -1063,6 +1201,7 @@
   box-shadow: calc(1 * var(--mm)) calc(2 * var(--mm)) calc(3 * var(--mm)) rgba(0, 0, 0, 0.45);
 }
 
+/* Cabeza de fibra de carbono con sus cerdas. */
 .tt-cepillo-sprite::after {
   content: '';
   position: absolute;
@@ -1077,12 +1216,38 @@
   box-shadow: calc(1 * var(--mm)) calc(2 * var(--mm)) calc(3 * var(--mm)) rgba(0, 0, 0, 0.45);
 }
 
-.tt:not(.es-sobre-plato):not(.es-frotando) .tt-cepillo-sprite {
+.tt:not(.tt-es-sobre-plato):not(.tt-es-frotando) .tt-cepillo-sprite {
   visibility: hidden;
+}
+
+/* ---------------------------------------------------- tamaños pequeños y táctil */
+
+/* Si el aparato se encoge mucho, la placa cede su sitio a los botones frontales. */
+@container tt-escenario (max-width: 400px) {
+  .tt-placa {
+    display: none;
+  }
+}
+
+/* Con dedo, los mandos pequeños ganan una zona de pulsación invisible alrededor. */
+@media (pointer: coarse) {
+  .tt-boton-frente,
+  .tt-rpm {
+    position: relative;
+  }
+
+  .tt-boton::after,
+  .tt-start::after,
+  .tt-cue::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
 }
 
 /* ------------------------------------------------------- movimiento reducido */
 
+/* El plato sigue girando (es contenido); lo demás deja de animarse y el bamboleo lo anula la vista. */
 @media (prefers-reduced-motion: reduce) {
   .tt-boton,
   .tt-start,
@@ -1090,7 +1255,8 @@
   .tt-brazo-svg,
   .tt-tapa-lamina,
   .tt-pantalla,
-  .tt-led {
+  .tt-led,
+  .tt-estrobo-luz {
     transition: none;
   }
 }
