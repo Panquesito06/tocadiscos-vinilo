@@ -3,7 +3,27 @@ import { presetFull, presetNormal, presetRing, solid, track } from '../core/defa
 import type { Vinyl, VinylMeta } from '../core/types';
 import { installFakeContext, type FakeContextInstall } from './fake-context';
 import { ImageCache } from './images';
-import { renderGatefoldInside, renderJacketBack, renderJacketFront, renderSpine, spineWidthMm } from './jacket';
+import { renderGatefoldInside, renderJacketBack, renderJacketFront, renderSpine, spineWidthMm, stickerPlacement } from './jacket';
+
+describe('posición de la pegatina', () => {
+  const S = 1000;
+  const pxPerMm = S / 315;
+  it('arriba queda en la esquina superior derecha', () => {
+    const p = stickerPlacement(S, pxPerMm, 'top');
+    expect(p.cy - p.r).toBeGreaterThan(0);
+    expect(p.cy + p.r).toBeLessThan(S * 0.3);
+    expect(p.cx + p.r).toBeLessThan(S);
+  });
+  it('abajo no pisa la esquina cortada ni la zona del título', () => {
+    const p = stickerPlacement(S, pxPerMm, 'bottom');
+    // El bloque del título ocupa como mucho el 60 % superior de la portada.
+    expect(p.cy - p.r).toBeGreaterThan(S * 0.6);
+    expect(p.cy + p.r).toBeLessThan(S);
+    // El punto del círculo más cercano a la esquina queda fuera del triángulo cortado (x + y > 2S − 0,08S).
+    const nearest = p.cx + p.cy + p.r * Math.SQRT2;
+    expect(nearest).toBeLessThan(2 * S - 0.08 * S);
+  });
+});
 
 function fakeImages(): ImageCache {
   const blobs = {

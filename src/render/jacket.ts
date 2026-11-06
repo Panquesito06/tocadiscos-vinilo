@@ -110,7 +110,11 @@ export function renderJacketFront(vinyl: Vinyl, sizePx: number, images: ImageCac
   if (jacket.showTitleOnFront) drawFrontTitles(ctx, vinyl, S);
   paintFinish(ctx, box, jacket.finish, seed);
   paintBoardEdges(ctx, box, seed);
-  if (jacket.sticker) drawSticker(ctx, jacket.sticker, S, S / jacketSizeMm(vinyl.disc.format));
+  if (jacket.sticker) {
+    // Con el título impreso arriba, la pegatina va abajo para no taparlo.
+    const titled = jacket.showTitleOnFront && (vinyl.meta.artist.trim() !== '' || vinyl.meta.title.trim() !== '');
+    drawSticker(ctx, jacket.sticker, S, S / jacketSizeMm(vinyl.disc.format), titled ? 'bottom' : 'top');
+  }
   if (jacket.cutCorner) cutCorner(ctx, S, 'right');
   return canvas;
 }
@@ -169,11 +173,27 @@ function paintBoardEdges(ctx: CanvasRenderingContext2D, box: Rect, seed: string)
   paintCornerWear(ctx, box, `${seed}|wear`, 0.07);
 }
 
-/** Pegatina redonda arriba a la derecha con su texto encogido dentro y una sombra mínima. */
-function drawSticker(ctx: CanvasRenderingContext2D, sticker: { text: string; color: string }, S: number, pxPerMm: number): void {
+/**
+ * Centro y radio de la pegatina: a la derecha, arriba o abajo. Abajo deja
+ * libre la esquina cortada (el triángulo ocupa el 8 % del lado).
+ */
+export function stickerPlacement(S: number, pxPerMm: number, corner: 'top' | 'bottom'): { cx: number; cy: number; r: number } {
   const r = clamp(22 * pxPerMm, S * 0.06, S * 0.13);
-  const cx = S - S * 0.055 - r;
-  const cy = S * 0.055 + r;
+  const inset = S * 0.055;
+  const cx = S - inset - r;
+  const cy = corner === 'top' ? inset + r : S - inset - r - S * CUT_CORNER * 0.5;
+  return { cx, cy, r };
+}
+
+/** Pegatina redonda a la derecha (arriba o abajo) con su texto encogido dentro y una sombra mínima. */
+function drawSticker(
+  ctx: CanvasRenderingContext2D,
+  sticker: { text: string; color: string },
+  S: number,
+  pxPerMm: number,
+  corner: 'top' | 'bottom',
+): void {
+  const { cx, cy, r } = stickerPlacement(S, pxPerMm, corner);
   ctx.save();
   ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
   ctx.shadowBlur = S * 0.008;

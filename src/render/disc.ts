@@ -877,22 +877,77 @@ function layoutOnce(input: LabelLayoutInput, measure: MeasureFn, f: number): Lab
   return flow;
 }
 
+/** Factor máximo de crecimiento de la tipografía cuando la galleta tiene poco texto. */
+export const LABEL_GROW_MAX = 1.45;
+/** Factor mínimo de reducción cuando hay mucho texto. */
+const LABEL_SHRINK_MIN = 0.3;
+
 /**
  * Maqueta todo el texto de la galleta dentro del círculo, evitando el
  * agujero: cabecera (cara y velocidad), marca grande, artista y título,
  * lista de canciones con duraciones, líneas extra, texto legal en la
  * columna izquierda junto al agujero (o al final si no cabe) y, abajo,
  * año, sello y número de catálogo. A cada línea le corresponde la cuerda
- * del círculo a su altura menos los márgenes. Si no cabe todo, reduce
- * proporcionalmente los tamaños hasta el mínimo de `MIN_FONT_PX`.
+ * del círculo a su altura menos los márgenes.
+ *
+ * Busca el MAYOR factor de escala con el que todo cabe: con poco texto la
+ * tipografía crece hasta `LABEL_GROW_MAX` (una galleta real no deja medio
+ * papel vacío) sin partir en dos ninguna línea que al tamaño base cabía
+ * entera; con mucho texto se reduce proporcionalmente hasta el mínimo de
+ * `MIN_FONT_PX`.
  */
 export function layoutLabelText(input: LabelLayoutInput, measure: MeasureFn): PlacedText[] {
-  let f = 1;
-  for (;;) {
-    const flow = layoutOnce(input, measure, f);
-    if (!flow.overflow || flow.atFloor() || f <= 0.3) return flow.placed;
-    f *= 0.9;
+  const base = layoutOnce(input, measure, 1);
+  if (!base.overflow) {
+    // Crecer: vale cualquier factor que no desborde, no añada líneas (cada línea colocada es un
+    // texto) y no deje ningún texto más pequeño que en la base. Lo último importa con los textos
+    // que se encogen para caber (sello, cabecera, catálogo): al bajar el cursor pueden caer en la
+    // franja partida por el agujero y quedar diminutos aunque "quepan".
+    const fits = (flow: LabelFlow): boolean =>
+      !flow.overflow &&
+      flow.placed.length === base.placed.length &&
+      flow.placed.every((p, i) => p.sizePx >= (base.placed[i]?.sizePx ?? 0) - 1e-6);
+    return largestFitting(input, measure, 1, LABEL_GROW_MAX, base, fits).placed;
   }
+  const smallest = layoutOnce(input, measure, LABEL_SHRINK_MIN);
+  if (smallest.overflow) {
+    // Ni al mínimo cabe todo: el primer factor que llega al suelo de tamaño es el más legible.
+    let f = 0.9;
+    for (;;) {
+      const flow = layoutOnce(input, measure, f);
+      if (!flow.overflow || flow.atFloor() || f <= LABEL_SHRINK_MIN) return flow.placed;
+      f *= 0.9;
+    }
+  }
+  return largestFitting(input, measure, LABEL_SHRINK_MIN, 1, smallest, (flow) => !flow.overflow).placed;
+}
+
+/**
+ * Búsqueda binaria del mayor factor en [lo, hi] que cumple `fits`, sabiendo
+ * que `atLo` (la maquetación con `lo`) lo cumple.
+ */
+function largestFitting(
+  input: LabelLayoutInput,
+  measure: MeasureFn,
+  lo: number,
+  hi: number,
+  atLo: LabelFlow,
+  fits: (flow: LabelFlow) => boolean,
+): LabelFlow {
+  const top = layoutOnce(input, measure, hi);
+  if (fits(top)) return top;
+  let best = atLo;
+  let low = lo;
+  let high = hi;
+  for (let i = 0; i < 10 && high - low > 0.01; i++) {
+    const mid = (low + high) / 2;
+    const flow = layoutOnce(input, measure, mid);
+    if (fits(flow)) {
+      low = mid;
+      best = flow;
+    } else high = mid;
+  }
+  return best;
 }
 
 /** Anillo fino de color alrededor del agujero (detalle de imprenta). */

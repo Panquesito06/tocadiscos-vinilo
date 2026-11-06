@@ -307,6 +307,32 @@ describe('layoutLabelText', () => {
     expect(sizeOf(placed, '1. ')).toBeLessThanOrEqual(sizeOf(normal, '1. '));
   });
 
+  it('con poco texto la tipografía crece para llenar la galleta, sin salirse', () => {
+    const one = input({ tracks: [track('Juega', 210)] });
+    const many = input({
+      tracks: Array.from({ length: 14 }, (_, i) => track(`Canción número ${i + 1} con un título largo`, 200)),
+    });
+    const sparse = layoutLabelText(one, fakeMeasure);
+    const dense = layoutLabelText(many, fakeMeasure);
+    expectInsideCircle(sparse, one);
+    expectInsideCircle(dense, many);
+    const titleSize = (list: typeof sparse) => list.find((p) => p.text === 'Grandes éxitos')?.sizePx ?? 0;
+    // Tamaño base del título: 2,6 mm a 4 px/mm = 10,4 px. Con una sola canción debe superarlo.
+    expect(titleSize(sparse)).toBeGreaterThan(10.4);
+    expect(titleSize(sparse)).toBeGreaterThan(titleSize(dense));
+  });
+
+  it('crecer nunca deja un texto más pequeño que al tamaño base (agujero grande de 7")', () => {
+    const inp = input({ holeRadiusMm: 19.05, holeRing: true, rpm: 45, radiusMm: 44 });
+    const placed = layoutLabelText(inp, fakeMeasure);
+    expectInsideCircle(placed, inp);
+    const brand = placed.find((p) => p.text === 'EMI');
+    expect(brand).toBeDefined();
+    // Tamaño base de la marca: 0,24 × 50 mm × (44 / 50) × 4 px/mm ≈ 42 px; puede encogerse para
+    // caber en su cuerda, pero no por haber bajado a la franja del agujero.
+    expect(Math.abs(brand!.yMm)).toBeGreaterThan(19.05);
+  });
+
   it('sin número de catálogo, el año queda anclado abajo dentro del círculo', () => {
     const inp = input();
     inp.label.fields.catalogNumber = '';
