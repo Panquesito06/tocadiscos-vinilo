@@ -223,7 +223,9 @@ export function byTest<E extends HTMLElement = HTMLElement>(root: ParentNode, te
 
 /** El control (input, select o textarea) asociado a la etiqueta visible `text`. */
 export function byLabel<E extends HTMLElement = HTMLInputElement>(root: ParentNode, text: string): E {
-  for (const label of Array.from(root.querySelectorAll('label'))) {
+  const labels = Array.from(root.querySelectorAll('label'));
+  if (root instanceof HTMLLabelElement) labels.unshift(root);
+  for (const label of labels) {
     if (label.textContent?.trim() !== text) continue;
     const target = label.htmlFor ? root.querySelector<E>(`#${label.htmlFor}`) : label.querySelector<E>('input, select, textarea');
     if (target) return target;

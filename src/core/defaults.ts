@@ -282,9 +282,10 @@ export function touch(vinyl: Vinyl, now = Date.now()): void {
 }
 
 /**
- * Propaga un cambio de datos generales a la galleta de ambas caras, al lomo
- * y al título de portada, SOLO en los campos que todavía coincidían con el
- * valor derivado del meta anterior (es decir, que el usuario no personalizó).
+ * Propaga un cambio de datos generales a la galleta de ambas caras y al
+ * lomo, SOLO en los campos que todavía coincidían con el valor derivado del
+ * meta anterior (es decir, que el usuario no personalizó). La portada no
+ * necesita propagación: dibuja artista y título directamente desde `meta`.
  */
 export function syncDerivedTexts(vinyl: Vinyl, prevMeta: VinylMeta): void {
   const meta = vinyl.meta;

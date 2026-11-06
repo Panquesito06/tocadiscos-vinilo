@@ -171,9 +171,15 @@ export function createEditorView(deps: EditorDeps): EditorView {
     return s;
   }
 
-  function endSession(): void {
-    if (!session) return;
+  /**
+   * Termina la sesión. Con el cajón cerrándose se deja el contenido tal
+   * cual (congelado, ya no se sincroniza) para que no se vacíe mientras se
+   * desliza; con el cajón abierto y sin vinilo se muestra el aviso.
+   */
+  function endSession(open: boolean): void {
     session = null;
+    if (!open) return;
+    if (shell.form.hidden) return;
     shell.general.replaceChildren();
     shell.panel.replaceChildren();
     shell.form.hidden = true;
@@ -232,7 +238,7 @@ export function createEditorView(deps: EditorDeps): EditorView {
     wasOpen = open;
     const vinyl = findVinyl(state, state.ui.editorVinylId);
     if (!vinyl) {
-      endSession();
+      endSession(open);
       return;
     }
     const tab = tabDefinition(state.ui.editorTab).id;
@@ -276,7 +282,8 @@ function buildShell(onTab: (tab: EditorTab) => void, onClose: () => void): Shell
   form.hidden = true;
   const empty = h('p', 'ed-empty', ['Elige un vinilo de la estantería para editarlo.']);
 
-  const root = h('aside', 'ed', [bar, form, empty]);
+  // La habitación lo envuelve en su propio <aside>: aquí basta una región con nombre.
+  const root = h('section', 'ed', [bar, form, empty]);
   root.dataset.test = 'editor';
   root.setAttribute('aria-labelledby', title.id);
   root.addEventListener('keydown', (e) => {

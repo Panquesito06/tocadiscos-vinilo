@@ -1,19 +1,19 @@
 /*
   Editor de vinilo: cajón de interfaz "de aplicación", carbón con texto
-  kraft. La habitación lo coloca (entra por la derecha); aquí solo se define
-  su interior: barra, vista previa, datos generales, pestañas y panel.
+  kraft. La habitación lo coloca y le da la anchura (entra por la derecha);
+  aquí el editor ocupa todo su contenedor y define su interior: barra,
+  vista previa, datos generales, pestañas y panel.
 */
 
 .ed {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  width: min(34rem, 100vw);
+  width: 100%;
   height: 100%;
   max-height: 100dvh;
   background: var(--fondo-ui);
   color: var(--texto-ui);
   font-size: var(--tamano-m);
-  box-shadow: var(--sombra-objeto);
 }
 
 /* Las clases con `display` anularían el atributo `hidden`. */

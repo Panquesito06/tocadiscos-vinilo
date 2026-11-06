@@ -88,7 +88,7 @@ export interface RingSpec {
   pattern: RingPattern;
   color1: string;
   color2: string;
-  widthMm: number; // 4..20
+  widthMm: number; // 4..maxRingWidthMm(format), hoy 10 mm en los tres formatos
   image?: ImageRef | null;
 }
 

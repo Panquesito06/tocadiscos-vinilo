@@ -184,7 +184,45 @@ describe('createEditorView', () => {
     expect(store.getState().vinyls).toHaveLength(0);
     expect(deps.closed).toBe(2);
     expect(renderers.invalidated).toContain(vinyl.id);
-    expect(view.el.querySelector('.ed-form')?.hasAttribute('hidden')).toBe(true);
+    // La sesión ha terminado: el formulario congelado ya no escribe.
+    const updates = store.updates;
+    typeInto(byTest<HTMLInputElement>(view.el, 'editor-titulo'), 'Nada');
+    expect(store.updates).toBe(updates);
+  });
+
+  it('al cerrar conserva el contenido mientras se desliza; abierto sin vinilo muestra el aviso', () => {
+    const { view, store, vinyl } = setup('lomo');
+    const form = view.el.querySelector('.ed-form') as HTMLElement;
+    store.update((d) => {
+      d.ui.view = 'room';
+      d.ui.editorVinylId = null;
+    });
+    expect(form.hidden).toBe(false);
+    expect(byTest(view.el, 'editor-lomo-texto').isConnected).toBe(true);
+    store.update((d) => {
+      d.ui.view = 'editor';
+    });
+    expect(form.hidden).toBe(true);
+    expect((view.el.querySelector('.ed-empty') as HTMLElement).hidden).toBe(false);
+    store.update((d) => {
+      d.ui.editorVinylId = vinyl.id;
+    });
+    expect(form.hidden).toBe(false);
+    expect(byTest<HTMLInputElement>(view.el, 'editor-lomo-texto').value).toBe('Queen — A Night at the Opera');
+  });
+
+  it('volver a abrir el cajón empieza una sesión nueva (el grosor vuelve a seguir al peso)', () => {
+    const { view, store, current, vinyl } = setup('disco');
+    typeInto(byTest<HTMLInputElement>(view.el, 'editor-grosor'), '1.3', true);
+    store.update((d) => {
+      d.ui.view = 'room';
+    });
+    store.update((d) => {
+      d.ui.view = 'editor';
+      d.ui.editorVinylId = vinyl.id;
+    });
+    choose(byTest<HTMLSelectElement>(view.el, 'editor-peso'), '180');
+    expect(current().disc.thicknessMm).toBeCloseTo(1.9);
   });
 
   it('Escape cierra el cajón', () => {
@@ -223,6 +261,9 @@ describe('vista previa', () => {
     expect(own).not.toBeNull();
     expect(own).not.toBe(last?.result);
     expect(own?.style.width).toBe(`${DISC_PREVIEW_PX}px`);
+    // happy-dom no da contexto 2D: blit() no dibuja, pero el canvas propio toma el tamaño pedido.
+    expect(own?.width).toBe(last?.result?.width);
+    expect(own?.height).toBe(last?.result?.height);
 
     store.update((d) => {
       const v = d.vinyls.find((x) => x.id === vinyl.id);
