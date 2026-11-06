@@ -651,7 +651,7 @@ class LabelFlow {
   constructor(
     private readonly input: LabelLayoutInput,
     private readonly measure: MeasureFn,
-    private readonly f: number,
+    readonly f: number,
   ) {
     this.reff = input.radiusMm * 0.93;
     this.keepOut = input.holeRadiusMm + 1.2 + (input.holeRing ? 0.8 : 0);
@@ -844,7 +844,7 @@ class LabelFlow {
   }
 }
 
-function layoutOnce(input: LabelLayoutInput, measure: MeasureFn, f: number): LabelFlow {
+function layoutOnce(input: LabelLayoutInput, measure: MeasureFn, f: number, below = false): LabelFlow {
   const flow = new LabelFlow(input, measure, f);
   const { fields, text, brandText } = input.label;
   const sideText = fields.sideMarker ? `Cara ${input.sideId}` : '';
@@ -855,6 +855,9 @@ function layoutOnce(input: LabelLayoutInput, measure: MeasureFn, f: number): Lab
 
   if (sideText || rpm) flow.placePair(sideText, rpm, text, LABEL_SIZE_MM.header);
   flow.placeShrinking(fields.brand.trim(), brandText, LABEL_SIZE_MM.brandMaxRatio * REFERENCE_LABEL_RADIUS_MM);
+  // Variante «como la galleta clásica»: cabecera y marca arriba, texto legal junto al agujero
+  // y artista, título y canciones debajo del agujero.
+  if (below) flow.y = Math.max(flow.y, flow.keepOut + 1);
   const artistStyle: TextStyle = { ...text, weight: Math.min(900, text.weight + 200) };
   flow.placeWrapped(fields.artist.trim(), artistStyle, LABEL_SIZE_MM.artist, 2);
   flow.placeWrapped(fields.title.trim(), text, LABEL_SIZE_MM.title, 2);
@@ -897,7 +900,17 @@ const LABEL_SHRINK_MIN = 0.3;
  * `MIN_FONT_PX`.
  */
 export function layoutLabelText(input: LabelLayoutInput, measure: MeasureFn): PlacedText[] {
-  const base = layoutOnce(input, measure, 1);
+  const above = layoutVariant(input, measure, false);
+  const below = layoutVariant(input, measure, true);
+  // Gana la maquetación de letra más grande; a igualdad, la que reparte el texto bajo el agujero
+  // (así una cara con pocas canciones no deja media galleta vacía).
+  return (below.f >= above.f ? below : above).placed;
+}
+
+/** Una de las dos maquetaciones (todo arriba o repartido bajo el agujero) con su mejor factor. */
+function layoutVariant(input: LabelLayoutInput, measure: MeasureFn, belowHole: boolean): LabelFlow {
+  const once = (f: number): LabelFlow => layoutOnce(input, measure, f, belowHole);
+  const base = once(1);
   if (!base.overflow) {
     // Crecer: vale cualquier factor que no desborde, no añada líneas (cada línea colocada es un
     // texto) y no deje ningún texto más pequeño que en la base. Lo último importa con los textos
@@ -907,19 +920,19 @@ export function layoutLabelText(input: LabelLayoutInput, measure: MeasureFn): Pl
       !flow.overflow &&
       flow.placed.length === base.placed.length &&
       flow.placed.every((p, i) => p.sizePx >= (base.placed[i]?.sizePx ?? 0) - 1e-6);
-    return largestFitting(input, measure, 1, LABEL_GROW_MAX, base, fits).placed;
+    return largestFitting(once, 1, LABEL_GROW_MAX, base, fits);
   }
-  const smallest = layoutOnce(input, measure, LABEL_SHRINK_MIN);
+  const smallest = once(LABEL_SHRINK_MIN);
   if (smallest.overflow) {
     // Ni al mínimo cabe todo: el primer factor que llega al suelo de tamaño es el más legible.
     let f = 0.9;
     for (;;) {
-      const flow = layoutOnce(input, measure, f);
-      if (!flow.overflow || flow.atFloor() || f <= LABEL_SHRINK_MIN) return flow.placed;
+      const flow = once(f);
+      if (!flow.overflow || flow.atFloor() || f <= LABEL_SHRINK_MIN) return flow;
       f *= 0.9;
     }
   }
-  return largestFitting(input, measure, LABEL_SHRINK_MIN, 1, smallest, (flow) => !flow.overflow).placed;
+  return largestFitting(once, LABEL_SHRINK_MIN, 1, smallest, (flow) => !flow.overflow);
 }
 
 /**
@@ -927,21 +940,20 @@ export function layoutLabelText(input: LabelLayoutInput, measure: MeasureFn): Pl
  * que `atLo` (la maquetación con `lo`) lo cumple.
  */
 function largestFitting(
-  input: LabelLayoutInput,
-  measure: MeasureFn,
+  once: (f: number) => LabelFlow,
   lo: number,
   hi: number,
   atLo: LabelFlow,
   fits: (flow: LabelFlow) => boolean,
 ): LabelFlow {
-  const top = layoutOnce(input, measure, hi);
+  const top = once(hi);
   if (fits(top)) return top;
   let best = atLo;
   let low = lo;
   let high = hi;
   for (let i = 0; i < 10 && high - low > 0.01; i++) {
     const mid = (low + high) / 2;
-    const flow = layoutOnce(input, measure, mid);
+    const flow = once(mid);
     if (fits(flow)) {
       low = mid;
       best = flow;
@@ -1129,6 +1141,9 @@ function cutHole(s: Scene): void {
   const { ctx, c, px } = s;
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
+  // `destination-out` borra en proporción a la opacidad del relleno: sin un color opaco
+  // heredaría el semitransparente del canto y el agujero quedaría gris en vez de vacío.
+  ctx.fillStyle = '#000';
   circlePath(ctx, c, c, (holeDiameterMm(s.disc.hole) / 2) * px);
   ctx.fill();
   ctx.restore();

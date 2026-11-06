@@ -206,6 +206,11 @@ export async function putBlob(db: TocadiscosDb, key: string, blob: Blob): Promis
   await db.put('blobs', blob, key);
 }
 
+/** Todas las claves del almacén de blobs. */
+export async function listBlobKeys(db: TocadiscosDb): Promise<string[]> {
+  return (await db.getAllKeys('blobs')).map(String);
+}
+
 /** Borra varias claves en una sola transacción (las inexistentes se ignoran). */
 export async function deleteBlobs(db: TocadiscosDb, keys: readonly string[]): Promise<void> {
   if (keys.length === 0) return;

@@ -16,6 +16,7 @@
  * estantería en cuanto sus pistas están listas, en orden.
  */
 import { generateDemoTrack, type DemoTrackSpec } from '../audio/demo';
+import { DEMO_ART_SIZE, paintDemoArtwork } from './demo-art';
 import { presetFull, presetNormal, presetRing, track } from '../core/defaults';
 import { defaultThicknessMm } from '../core/geometry';
 import type { Store } from '../core/store';
@@ -166,9 +167,31 @@ export async function seedDemoCollectionWith(
   const added: Vinyl[] = [];
   for (const { album, sideA, sideB } of pending) {
     const vinyl = buildVinyl(album, await sideA, await sideB);
+    if (album.preset === 'full') await attachPaintedArtwork(store, vinyl);
     added.push(store.addVinyl(vinyl));
   }
   return added;
+}
+
+/**
+ * Cara A del vinilo «enteramente decorado»: obra pintada (texto en arco y una
+ * rosa de los vientos) en lugar del degradado del preset. Sin canvas (tests)
+ * o si falla, el disco conserva el degradado.
+ */
+async function attachPaintedArtwork(store: Store, vinyl: Vinyl): Promise<void> {
+  try {
+    const art = await paintDemoArtwork(vinyl.meta.artist, vinyl.meta.title);
+    if (!art) return;
+    const blobKey = await store.blobs.put(art);
+    vinyl.disc.sides[0].artwork = {
+      kind: 'image',
+      image: { blobKey, width: DEMO_ART_SIZE, height: DEMO_ART_SIZE, name: 'cara-pintada.jpg' },
+      fit: 'cover',
+      backdrop: '#d8d2c2',
+    };
+  } catch (error) {
+    console.warn('Tocadiscos: no se pudo pintar la cara decorada de la demostración; queda el degradado.', error);
+  }
 }
 
 function buildVinyl(album: DemoAlbumPlan, tracksA: Track[], tracksB: Track[]): Vinyl {

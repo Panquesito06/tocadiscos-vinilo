@@ -443,6 +443,20 @@ describe('addVinyl y removeVinyl', () => {
 // ---------------------------------------------------------------------------
 
 describe('blobs', () => {
+  it('al cargar borra los blobs que ningún vinilo usa (siembra o importación interrumpida)', async () => {
+    const dbName = uniqueDbName();
+    const first = await readyStore(dbName);
+    const used = await first.blobs.put(textBlob('portada'));
+    const orphan = await first.blobs.put(textBlob('wav a medias'));
+    first.addVinyl(createVinyl({ jacket: { front: imageFill(used) } }));
+    await first.flush();
+
+    const second = await readyStore(dbName);
+    expect(await second.blobs.get(orphan)).toBeNull();
+    expect(await (await second.blobs.get(used))!.text()).toBe('portada');
+    expect((await readRaw(dbName)).blobKeys).toEqual([used]);
+  });
+
   it('put/get/delete con claves generadas o propias', async () => {
     const store = await readyStore(uniqueDbName());
     const key = await store.blobs.put(textBlob('hola'));

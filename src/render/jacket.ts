@@ -237,6 +237,7 @@ function cutCorner(ctx: CanvasRenderingContext2D, S: number, side: 'right' | 'le
   const inward = side === 'right' ? -leg : leg;
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = '#000'; // opaco: el borrado depende de la opacidad del relleno
   ctx.beginPath();
   ctx.moveTo(corner, S);
   ctx.lineTo(corner + inward, S);
@@ -557,10 +558,9 @@ function drawBarcode(ctx: CanvasRenderingContext2D, box: Rect, seed: string): vo
   let bar = true;
   while (i < modules) {
     const run = Math.min(1 + randInt(rng, 3), modules - i);
-    if (bar) {
-      const tall = i <= 2 || i + run >= modules - 2 || Math.abs(i - modules / 2) < 2;
-      ctx.fillRect(box.x + pad + i * moduleW, box.y + pad, run * moduleW, barsH + (tall ? digitsH * 0.5 : 0));
-    }
+    // Todas las barras terminan sobre la franja de los dígitos: las de guarda alargadas los tachaban,
+    // porque aquí los dígitos van centrados en una sola línea y no repartidos entre las guardas.
+    if (bar) ctx.fillRect(box.x + pad + i * moduleW, box.y + pad, run * moduleW, barsH);
     i += run;
     bar = !bar;
   }

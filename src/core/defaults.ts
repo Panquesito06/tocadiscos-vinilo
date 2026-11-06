@@ -254,7 +254,7 @@ export function presetFull(meta: Partial<VinylMeta> = {}, tracksA: Track[] = [])
     meta,
     disc: { material: 'color', color: '#d8d2c2', weightGrams: 160 },
     innerSleeve: defaultInnerSleeve({ kind: 'poly-lined', color: '#f3f1ec' }),
-    jacket: defaultJacket({ front: gradient('#8a1f1f', '#d8d2c2', 120, true), gatefold: true }),
+    jacket: defaultJacket({ front: gradient('#8a1f1f', '#2b2a2e', 120, true), gatefold: true }),
     spine: defaultSpine(defaultMeta(meta), { background: '#8a1f1f', accentColor: '#d8d2c2' }),
   });
   v.disc.thicknessMm = defaultThicknessMm(160);
@@ -334,11 +334,15 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 /**
  * Mezcla un valor guardado sobre su valor por defecto: rellena los campos
  * que falten (versiones anteriores del esquema) sin tocar los presentes.
- * Los objetos con `kind` (rellenos) y los arrays se toman tal cual.
+ * Los objetos con `kind` (rellenos) y los arrays se toman tal cual. Un
+ * campo anulable cuyo valor por defecto es `null` (franja del lomo, anillo
+ * del agujero, última limpieza…) acepta lo guardado tal cual: su tipo no
+ * se puede deducir del `null`.
  */
 export function mergeWithDefaults<T>(def: T, val: unknown): T {
   if (val === undefined) return def;
   if (val === null) return null as T;
+  if (def === null) return val as T;
   if (Array.isArray(def)) return (Array.isArray(val) ? val : def) as T;
   if (isPlainObject(def)) {
     if (!isPlainObject(val)) return def;

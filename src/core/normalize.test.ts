@@ -5,6 +5,7 @@ import {
   defaultMeta,
   normalizeVinyl,
   presetNormal,
+  presetRing,
   spineTextFor,
   syncDerivedTexts,
   touch,
@@ -39,6 +40,18 @@ describe('normalizeVinyl', () => {
     expect(v.jacket.back.kind).toBe('solid');
     expect(v.spine.text).toBe('Alguien — Algo');
     expect(v.outerSleeve.kind).toBe('pvc-clear');
+  });
+
+  it('conserva los campos anulables con valor (por defecto null): franja, anillo y última limpieza', () => {
+    const v = presetRing({ artist: 'A', title: 'B' });
+    v.spine.accentColor = '#d1302a';
+    v.disc.sides[0].label.holeRingColor = '#123456';
+    v.disc.condition.lastCleanedAt = 1793976051928;
+    const n = normalizeVinyl(JSON.parse(JSON.stringify(v)));
+    expect(n.spine.accentColor).toBe('#d1302a');
+    expect(n.disc.sides[0].label.holeRingColor).toBe('#123456');
+    expect(n.disc.condition.lastCleanedAt).toBe(1793976051928);
+    expect(n).toEqual(v);
   });
 
   it('conserva null donde el usuario lo dejó', () => {

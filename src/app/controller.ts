@@ -743,6 +743,10 @@ export function createController(deps: ControllerDeps): Controller {
     const radius = clamp(target, 0, REST_RADIUS_MM);
     dragging = isDragging;
     liveRadius = radius;
+    // El brazo toma el mando: el siguiente frame reancla la posición del motor en el radio nuevo.
+    // Sin esto, un salto con el teclado mientras suena se sumaba como tiempo «sonado» y podía
+    // contar como reproducción completa (con su desgaste, que es irreversible).
+    armDrives = true;
     const disc = loadedDiscOf(store.getState());
     if (disc) engine.seekSec(timeAt(disc, radius));
     // Durante el arrastre solo se escribe al salir del soporte; al soltar, el radio final.

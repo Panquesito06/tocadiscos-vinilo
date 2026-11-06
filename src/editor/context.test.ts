@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createVinyl } from '../core/defaults';
 import type { Fill, Vinyl } from '../core/types';
 import { button, h } from './controls';
@@ -27,7 +27,7 @@ describe('editVinyl', () => {
     expect(s.store.updates).toBe(0);
   });
 
-  it('borra y olvida los blobs que la edición deja sin usar, salvo los que usa otro vinilo', () => {
+  it('borra y olvida los blobs que la edición deja sin usar, salvo los que usa otro vinilo', async () => {
     const a = createVinyl({ jacket: { front: imageFill('propia'), back: imageFill('compartida') } });
     const b = createVinyl({ jacket: { front: imageFill('compartida') } });
     const s = services([a, b]);
@@ -35,8 +35,27 @@ describe('editVinyl', () => {
       x.jacket.front = { kind: 'solid', color: '#000000' };
       x.jacket.back = { kind: 'solid', color: '#ffffff' };
     });
-    expect(s.store.deletedBlobs).toEqual(['propia']);
     expect(s.renderers.forgotten).toEqual(['propia']);
+    // El borrado espera a que se guarde el documento que ya no la usa.
+    expect(s.store.deletedBlobs).toEqual([]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.store.deletedBlobs).toEqual(['propia']);
+  });
+
+  it('no borra un blob sustituido si el guardado falla', async () => {
+    const a = createVinyl({ jacket: { front: imageFill('propia') } });
+    const s = services([a]);
+    s.store.flush = async () => {
+      throw new Error('disco lleno');
+    };
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    editVinyl(s, a.id, (x) => {
+      x.jacket.front = { kind: 'solid', color: '#000000' };
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.store.deletedBlobs).toEqual([]);
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
   });
 
   it('no borra una imagen que la misma edición sigue usando en otra parte', () => {

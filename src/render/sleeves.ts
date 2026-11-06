@@ -156,6 +156,7 @@ function cutHole(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numbe
   if (r <= 0) return;
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = '#000'; // opaco: el borrado depende de la opacidad del relleno
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();

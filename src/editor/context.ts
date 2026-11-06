@@ -113,18 +113,34 @@ type BlobServices = Pick<EditorServices, 'store' | 'renderers'>;
 /**
  * Borra del almacén las claves que ya no usa ningún vinilo y las olvida en
  * la caché de imágenes. Las que siguen en uso se dejan tal cual.
+ *
+ * El borrado espera a que se haya guardado el documento que deja de apuntar
+ * a esas claves (`store.flush()`) y vuelve a comprobar que siguen sin uso.
+ * Al revés, cerrar la pestaña en ese hueco dejaba lo guardado apuntando a un
+ * archivo ya borrado. Si el guardado falla, no se borra nada.
  */
 export function releaseBlobs(services: BlobServices, keys: readonly string[]): string[] {
-  const vinyls = services.store.getState().vinyls;
+  const { store } = services;
   const released: string[] = [];
   for (const key of new Set(keys)) {
-    if (isBlobKeyInUse(key, vinyls)) continue;
+    if (isBlobKeyInUse(key, store.getState().vinyls)) continue;
     released.push(key);
     services.renderers.images.forget(key);
-    services.store.blobs.delete(key).catch((err: unknown) => {
-      console.error('Tocadiscos: no se pudo borrar un archivo que ya no se usa.', err);
-    });
   }
+  if (released.length === 0) return released;
+  store.flush().then(
+    async () => {
+      for (const key of released) {
+        if (isBlobKeyInUse(key, store.getState().vinyls)) continue;
+        await store.blobs.delete(key).catch((err: unknown) => {
+          console.error('Tocadiscos: no se pudo borrar un archivo que ya no se usa.', err);
+        });
+      }
+    },
+    (err: unknown) => {
+      console.error('Tocadiscos: no se borran los archivos sustituidos porque no se pudo guardar la colección.', err);
+    },
+  );
   return released;
 }
 

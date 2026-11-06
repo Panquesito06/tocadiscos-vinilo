@@ -482,7 +482,7 @@ describe('canciones', () => {
     expect(view.el.textContent).toContain('El navegador no puede reproducir este formato');
   });
 
-  it('ordena, edita la duración solo sin audio y quita audio y canciones', () => {
+  it('ordena, edita la duración solo sin audio y quita audio y canciones', async () => {
     const { view, store, current, vinyl } = setup('canciones');
     store.update((d) => {
       const v = d.vinyls.find((x) => x.id === vinyl.id);
@@ -504,6 +504,8 @@ describe('canciones', () => {
 
     (view.el.querySelector('button[aria-label="Quitar el audio de la canción 1"]') as HTMLButtonElement).click();
     expect(current().disc.sides[0].tracks[0]?.audio).toBeNull();
+    // El archivo se borra después de guardar el documento que ya no lo usa.
+    await new Promise((r) => setTimeout(r, 0));
     expect(store.deletedBlobs).toContain('aud_lazing');
 
     (view.el.querySelector('button[aria-label="Quitar la canción 2"]') as HTMLButtonElement).click();

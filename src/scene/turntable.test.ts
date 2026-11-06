@@ -378,14 +378,19 @@ describe('update', () => {
   it('la pantalla muestra artista – título, cara y tiempo; entrada y salida; nada sin corriente', () => {
     const view = mount();
     const display = q(view, 'tt-pantalla');
-    view.update(withDisc('12'));
+    const inGroove = makeState({ tonearm: { onRest: false, lifted: false, radiusMm: 120 } });
+    view.update(withDisc('12', { state: inGroove }));
     expect(display.textContent).toContain('Queen – Bohemian Rhapsody');
     expect(display.textContent).toContain('Cara A');
     expect(display.textContent).toContain('3:10 / 20:50');
-    view.update(withDisc('12', { positionSec: -3 }));
+    view.update(withDisc('12', { state: inGroove, positionSec: -3 }));
     expect(display.textContent).toContain('entrada');
-    view.update(withDisc('12', { positionSec: 1300 }));
+    view.update(withDisc('12', { state: inGroove, positionSec: 1300 }));
     expect(display.textContent).toContain('salida');
+    // Con el brazo en el soporte no se muestra ninguna posición del surco.
+    view.update(withDisc('12', { positionSec: -2 }));
+    expect(display.textContent).toContain('brazo en reposo');
+    expect(display.textContent).not.toContain('entrada');
     view.update(withDisc('12', { state: makeState({ power: false }) }));
     expect(display.textContent).toBe('');
   });
@@ -496,6 +501,41 @@ describe('teclado', () => {
     actions.moveTonearm.mockClear();
     key(document.body, 'ArrowLeft');
     expect(actions.moveTonearm).not.toHaveBeenCalled();
+  });
+
+  it('desde el soporte, ← y Av Pág llevan el cabezal al surco de entrada del disco cargado', () => {
+    const actions = makeActions();
+    const view = mount(actions);
+    view.update(withDisc('12'));
+    const arm = q(view, 'tt-brazo');
+    key(arm, 'ArrowLeft');
+    expect(actions.moveTonearm).toHaveBeenLastCalledWith(146, false);
+    key(arm, 'PageDown');
+    expect(actions.moveTonearm).toHaveBeenLastCalledWith(146, false);
+    view.update(withDisc('7'));
+    key(arm, 'ArrowLeft');
+    expect(actions.moveTonearm).toHaveBeenLastCalledWith(84, false);
+  });
+
+  it('la barra espaciadora no toca el motor con la escena inerte ni sobre un <summary>', () => {
+    const actions = makeActions();
+    const view = mount(actions);
+    view.update(makeFrame());
+    const holder = view.el.parentElement!;
+    holder.setAttribute('inert', '');
+    key(document.body, ' ');
+    expect(actions.toggleMotor).not.toHaveBeenCalled();
+    holder.removeAttribute('inert');
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = 'Vista previa';
+    summary.tabIndex = 0;
+    details.append(summary);
+    document.body.append(details);
+    summary.focus();
+    key(summary, ' ');
+    expect(actions.toggleMotor).not.toHaveBeenCalled();
+    details.remove();
   });
 
   it('más allá de 160 mm la flecha devuelve el brazo al soporte', () => {

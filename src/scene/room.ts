@@ -383,12 +383,30 @@ export function createRoomView(parts: RoomParts): RoomView {
 
   // ----- update -------------------------------------------------------------------
 
+  /** Vinilo que estaba en la mano: al cerrarla, el foco vuelve a su lomo. */
+  let handVinylId: string | null = null;
+
+  /**
+   * Al cerrar la mano el foco caía en `body` (el lomo se había sustituido por
+   * un hueco y se vuelve a crear): quien navega con teclado volvía al principio
+   * de la página. Si el foco se ha perdido, vuelve al lomo del vinilo.
+   */
+  function restoreFocusToSpine(id: string): void {
+    const active = document.activeElement;
+    if (active && active !== document.body && root.contains(active)) return;
+    const spine = Array.from(root.querySelectorAll<HTMLElement>('[data-test="lomo"]')).find((el) => el.dataset.vinylId === id);
+    spine?.focus({ preventScroll: true });
+  }
+
   function update(state: AppState, renderers: Renderers): void {
+    const wasHand = view === 'hand';
     applyView(state.ui.view);
     shelf.update(state, renderers);
     hand.update(state, renderers);
     applySettings(state.settings);
     applyToast(state.ui.toast);
+    if (wasHand && view === 'room' && handVinylId) restoreFocusToSpine(handVinylId);
+    if (view === 'hand') handVinylId = state.ui.handVinylId;
   }
 
   // Estado inicial coherente antes del primer update (sin mano ni cajón).

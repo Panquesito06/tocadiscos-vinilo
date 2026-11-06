@@ -759,9 +759,12 @@ export function createShelfView(actions: ShelfActions): ShelfView {
     if (!spine || !id || ev.ctrlKey || ev.metaKey) return;
     if (ev.key === 'Enter') {
       ev.preventDefault();
+      hideThumb();
       actions.pickVinyl(id);
     } else if ((ev.key === 'e' || ev.key === 'E') && !ev.altKey) {
       ev.preventDefault();
+      // El foco se queda en el lomo: sin esto la miniatura asomaba por el borde del cajón.
+      hideThumb();
       actions.openEditor(id);
     } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
       ev.preventDefault();

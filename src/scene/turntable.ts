@@ -291,7 +291,7 @@ function isPrimaryButton(ev: PointerEvent): boolean {
 function isFormControl(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName;
-  if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+  if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'SUMMARY') return true;
   return (el as HTMLElement).isContentEditable === true;
 }
 
@@ -1045,6 +1045,13 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
 
   // ----- teclado --------------------------------------------------------------
   function stepTonearm(deltaMm: number): void {
+    if (deltaMm < 0 && (lastFrame?.state.tonearm.onRest ?? true)) {
+      // Desde el soporte, la primera pulsación lleva el cabezal al borde del disco (surco de
+      // entrada). Restar unos milímetros a los 182 del soporte se quedaba por encima del umbral
+      // de vuelta al soporte y el brazo no se movía.
+      actions.moveTonearm(discGeometry(lastFrame?.discFormat ?? '12').outerGrooveMm, false);
+      return;
+    }
     const next = currentRadius() + deltaMm;
     actions.moveTonearm(next > REST_THRESHOLD_MM ? 'rest' : Math.max(MIN_RADIUS_MM, next), false);
   }
@@ -1088,6 +1095,10 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     if (ev.key !== ' ' || ev.repeat || ev.defaultPrevented || !root.isConnected) return;
     if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
     if (isFormControl(document.activeElement) || isFormControl(ev.target as Element | null)) return;
+    // Con una capa modal abierta (el vinilo en la mano deja la escena `inert`) o el foco en
+    // otro panel (el editor), la barra espaciadora no es para el tocadiscos.
+    if (root.closest('[inert]')) return;
+    if (document.activeElement?.closest('[role="dialog"], [role="tabpanel"], [role="tablist"]')) return;
     ev.preventDefault();
     actions.toggleMotor();
   };
@@ -1197,7 +1208,10 @@ export function createTurntableView(actions: TurntableActions): TurntableView {
     const np = frame.nowPlaying;
     setText(dom.displayTitle, np ? `${np.artist} – ${np.title}` : present ? 'Sin canción' : 'Sin disco');
     setText(dom.displaySide, present ? (frame.sideName ?? '') : '');
-    setText(dom.displayTime, present ? formatPosition(frame.positionSec, frame.sideDurationSec) : '');
+    // Con el brazo en el soporte no hay posición que mostrar (antes salía «entrada», como si la
+    // aguja estuviera en el surco de entrada).
+    const time = !present ? '' : frame.state.tonearm.onRest ? 'brazo en reposo' : formatPosition(frame.positionSec, frame.sideDurationSec);
+    setText(dom.displayTime, time);
   }
 
   function update(frame: TurntableFrame): void {

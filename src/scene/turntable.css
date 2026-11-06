@@ -833,9 +833,11 @@
 .tt-pantalla {
   position: absolute;
   left: calc(164 * var(--mm));
-  top: calc(324 * var(--mm));
+  /* Empieza 7 mm más abajo que los demás mandos para no quedar bajo el cabezal en reposo
+     (aguja a ≈ 321 mm); dos líneas de texto caben en 29 mm. */
+  top: calc(331 * var(--mm));
   width: calc(144 * var(--mm));
-  height: calc(36 * var(--mm));
+  height: calc(29 * var(--mm));
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1234,6 +1236,13 @@
   .tt-boton-frente,
   .tt-rpm {
     position: relative;
+  }
+
+  /* La zona de toque ampliada (::after) se sale del botón: con `overflow: hidden`
+     quedaba recortada y los botones del frente seguían midiendo unos 12 px de alto. */
+  .tt-boton-frente {
+    overflow: visible;
+    text-overflow: clip;
   }
 
   .tt-boton::after,

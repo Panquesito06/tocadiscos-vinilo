@@ -117,6 +117,22 @@ describe('createRoomView', () => {
     expect(room.el.querySelector('h1')?.textContent).toBe('Habitación de escucha');
   });
 
+  it('al cerrar la mano, el foco perdido vuelve al lomo del vinilo', () => {
+    const { room, shelf } = setup();
+    const lomo = document.createElement('button');
+    lomo.dataset.test = 'lomo';
+    lomo.dataset.vinylId = 'vin_1';
+    shelf.el.append(lomo);
+    const inHand = initialAppState();
+    inHand.ui.view = 'hand';
+    inHand.ui.handVinylId = 'vin_1';
+    room.update(inHand, renderers());
+    (document.activeElement as HTMLElement | null)?.blur();
+    const back = initialAppState();
+    room.update(back, renderers());
+    expect(document.activeElement).toBe(lomo);
+  });
+
   it('update delega en la estantería y en la mano', () => {
     const { room, shelf, hand } = setup();
     const state = initialAppState();

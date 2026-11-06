@@ -37,7 +37,7 @@
  *  - `ready` se rechaza si IndexedDB no se puede abrir (el error dice qué
  *    pasó); `update()` antes de `ready` se sobreescribe con lo cargado.
  */
-import { orphanBlobKeys } from './blobs';
+import { collectBlobKeys, orphanBlobKeys } from './blobs';
 import {
   defaultSettings,
   defaultTurntableState,
@@ -53,6 +53,7 @@ import {
   DEFAULT_DB_NAME,
   deleteBlobs,
   getBlob,
+  listBlobKeys,
   migrateDocument,
   putBlob,
   readDocument,
@@ -219,6 +220,24 @@ export function createStore(options: StoreOptions = {}): Store {
       else await writeDocument(db, snapshotOf(loaded), SCHEMA_VERSION);
     } catch (err) {
       console.error('Tocadiscos: no se pudo actualizar la versión de la colección guardada.', err);
+    }
+    await pruneOrphanBlobs(loaded);
+  }
+
+  /**
+   * Borra los blobs que ningún vinilo usa. Aparecen si se cierra la pestaña a
+   * mitad de una siembra o de una importación (los archivos se guardan antes
+   * que el vinilo que los usa). Solo se hace al cargar, cuando todavía no hay
+   * ninguna importación en curso. Un fallo aquí no impide arrancar.
+   */
+  async function pruneOrphanBlobs(loaded: AppState): Promise<void> {
+    try {
+      const db = await connection.get();
+      const used = new Set(loaded.vinyls.flatMap((v) => collectBlobKeys(v)));
+      const orphans = (await listBlobKeys(db)).filter((k) => !used.has(k));
+      if (orphans.length > 0) await deleteBlobs(db, orphans);
+    } catch (err) {
+      console.error('Tocadiscos: no se pudieron limpiar los archivos que ya no usa ningún vinilo.', err);
     }
   }
 
