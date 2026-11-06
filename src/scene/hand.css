@@ -1,0 +1,393 @@
+/*
+  Vinilo en la mano. El objeto se compone en `.mano-objeto` (S × S, con
+  S = --mano-lado) con cuatro capas centradas que se deslizan y funden
+  según `data-etapa`: la carpeta (dos caras que giran con rotateY), el
+  interior desplegable (doble ancho), la funda interior con el disco debajo
+  y el disco suelto (dos caras y brillo fijo encima). Cada capa se mueve
+  con `--x` (desplazamiento horizontal) y `--sx`/`--s` (escala), así una
+  sola regla de `transform` sirve para todas las etapas y las transiciones
+  interpolan.
+*/
+
+.mano {
+  --mano-lado: 560px;
+  --mano-disco: 537px;
+  --mano-escala-desplegable: 1;
+  --mano-cepillo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='rotate(-35 16 16)'%3E%3Crect x='12' y='2' width='8' height='14' rx='3' fill='%235a3a22' stroke='%231c1b19' stroke-width='1.2'/%3E%3Crect x='9' y='15' width='14' height='6' rx='1.5' fill='%232b2a2e' stroke='%23e6d3a8' stroke-width='1'/%3E%3Cpath d='M10 21v8M13 21v9M16 21v9M19 21v9M22 21v8' stroke='%23c9a66b' stroke-width='1.4' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E")
+      24 27,
+    crosshair;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--esp-5);
+  width: 100%;
+  color: var(--texto-ui);
+  font-family: var(--fuente);
+  outline: none;
+}
+
+.mano [hidden] {
+  display: none !important;
+}
+
+.mano-sin-transicion,
+.mano-sin-transicion * {
+  transition: none !important;
+}
+
+/* ------------------------------------------------------------ escenario */
+
+.mano-escenario {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: var(--mano-lado);
+}
+
+.mano-objeto {
+  position: relative;
+  flex: none;
+  width: var(--mano-lado);
+  height: var(--mano-lado);
+}
+
+.mano-capa {
+  --x: 0px;
+  --sx: 1;
+  --s: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) translateX(var(--x)) scaleX(var(--sx)) scale(var(--s));
+  transition:
+    transform var(--dur-media) var(--curva),
+    opacity var(--dur-media) var(--curva),
+    visibility 0s linear var(--dur-media);
+}
+
+.mano-lienzo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  max-width: none;
+}
+
+/* Carpeta: dos caras que giran sobre el eje vertical. */
+.mano-carpeta {
+  z-index: 2;
+  width: var(--mano-lado);
+  height: var(--mano-lado);
+  perspective: 1800px;
+}
+
+.mano-carpeta-giro {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-media) var(--curva);
+}
+
+.mano-cara {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  box-shadow: var(--sombra-objeto);
+}
+
+.mano-dorso {
+  transform: rotateY(180deg);
+}
+
+.mano-funda-exterior {
+  transition: opacity var(--dur-media) var(--curva);
+}
+
+/* Vista por detrás, el reflejo de la funda exterior queda invertido. */
+.mano-funda-exterior-dorso {
+  transform: scaleX(-1);
+}
+
+/* Interior desplegable: se abre desde el centro. */
+.mano-desplegable {
+  --sx: 0.5;
+  z-index: 3;
+  width: calc(2 * var(--mano-lado));
+  height: var(--mano-lado);
+  box-shadow: var(--sombra-objeto);
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Funda interior con el disco dentro (asoma la galleta por el troquel). */
+.mano-funda {
+  z-index: 1;
+  width: var(--mano-disco);
+  height: var(--mano-disco);
+  filter: drop-shadow(4px 8px 12px rgba(0, 0, 0, 0.45));
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Disco suelto. */
+.mano-disco {
+  --x: calc(var(--mano-lado) * 0.3);
+  z-index: 4;
+  width: var(--mano-disco);
+  height: var(--mano-disco);
+  border-radius: 50%;
+  perspective: 1800px;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mano-disco-giro {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-media) var(--curva);
+}
+
+.mano-disco-cara {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  box-shadow: 8px 14px 24px rgba(0, 0, 0, 0.5);
+}
+
+.mano-disco-b {
+  transform: rotateY(180deg);
+}
+
+/* Brillo fijo de la luz (arriba a la izquierda): no gira con el disco. */
+.mano-brillo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 30% 24%, rgba(255, 240, 220, 0.16), rgba(255, 240, 220, 0) 42%),
+    conic-gradient(
+      from 205deg at 50% 50%,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 0.13) 28deg,
+      rgba(255, 255, 255, 0) 64deg,
+      rgba(255, 255, 255, 0) 180deg,
+      rgba(255, 255, 255, 0.07) 212deg,
+      rgba(255, 255, 255, 0) 246deg
+    );
+  mix-blend-mode: screen;
+}
+
+/* ------------------------------------------------------------ etapas */
+
+.mano-objeto[data-etapa='jacket-back'] .mano-carpeta-giro {
+  transform: rotateY(180deg);
+}
+
+.mano-objeto[data-etapa='gatefold'] .mano-carpeta {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mano-objeto[data-etapa='gatefold'] .mano-desplegable {
+  --sx: 1;
+  --s: var(--mano-escala-desplegable);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.mano-objeto[data-etapa='inner-out'] .mano-carpeta {
+  --x: calc(var(--mano-lado) * -0.3);
+}
+
+.mano-objeto[data-etapa='inner-out'] .mano-funda {
+  --x: calc(var(--mano-lado) * 0.3);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.mano-objeto[data-etapa='inner-out'] .mano-funda-exterior {
+  opacity: 0;
+}
+
+.mano-objeto[data-etapa='disc-out'] .mano-carpeta {
+  --x: calc(var(--mano-lado) * -0.55);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mano-objeto[data-etapa='disc-out'] .mano-funda {
+  --x: calc(var(--mano-lado) * -0.1);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mano-objeto[data-etapa='disc-out'] .mano-disco {
+  --x: 0px;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.mano-objeto[data-cara='B'] .mano-disco-giro {
+  transform: rotateY(180deg);
+}
+
+/* Modo cepillo: arrastrar sobre el disco. */
+.mano-con-cepillo .mano-disco {
+  cursor: var(--mano-cepillo);
+  touch-action: none;
+}
+
+.mano-con-cepillo .mano-disco::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px dashed rgba(201, 166, 107, 0.6);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.mano-disco.es-cepillando::after {
+  border-color: var(--kraft-claro);
+}
+
+/* ------------------------------------------------------------ controles y datos */
+
+.mano-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-4);
+  width: min(760px, 100%);
+}
+
+.mano-controles {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-2);
+}
+
+.mano-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--esp-2);
+}
+
+.mano-boton {
+  min-height: 36px;
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-m);
+  background: rgba(28, 27, 25, 0.86);
+  color: var(--texto-ui);
+  font-size: var(--tamano-s);
+  font-weight: 600;
+  transition:
+    background-color var(--dur-rapida) var(--curva),
+    border-color var(--dur-rapida) var(--curva),
+    color var(--dur-rapida) var(--curva);
+}
+
+.mano-boton:hover:not(:disabled) {
+  background: var(--carbon-claro);
+  border-color: rgba(201, 166, 107, 0.5);
+}
+
+.mano-boton:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.mano-boton[aria-pressed='true'] {
+  background: var(--acento);
+  border-color: var(--rojo-emi-oscuro);
+  color: var(--acento-texto);
+}
+
+.mano-boton-principal {
+  background: var(--kraft);
+  border-color: var(--kraft-oscuro);
+  color: var(--carbon);
+}
+
+.mano-boton-principal:hover:not(:disabled) {
+  background: var(--kraft-claro);
+  border-color: var(--kraft);
+  color: var(--carbon);
+}
+
+.mano-boton-guardar {
+  border-color: rgba(201, 166, 107, 0.55);
+}
+
+.mano-pista {
+  font-size: var(--tamano-xs);
+  color: var(--texto-ui-suave);
+}
+
+.mano-datos {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-3);
+  text-align: center;
+}
+
+.mano-nombre {
+  display: grid;
+  gap: var(--esp-1);
+}
+
+.mano-titulo {
+  font-size: var(--tamano-xl);
+  font-weight: 900;
+  font-stretch: 118%;
+  line-height: 1.1;
+  color: var(--kraft-claro);
+}
+
+.mano-artista {
+  font-size: var(--tamano-m);
+  font-weight: 500;
+  color: var(--texto-ui-suave);
+}
+
+.mano-ficha {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--esp-2) var(--esp-5);
+  margin: 0;
+}
+
+.mano-par {
+  display: grid;
+  text-align: center;
+}
+
+.mano-etiqueta {
+  font-size: var(--tamano-xs);
+  color: var(--texto-ui-apagado);
+}
+
+.mano-dato {
+  margin: 0;
+  font-size: var(--tamano-s);
+  font-weight: 600;
+  font-stretch: 90%;
+  color: var(--texto-ui);
+}
+
+.mano-aviso-polvo {
+  font-size: var(--tamano-s);
+  font-weight: 700;
+  color: var(--foco);
+}

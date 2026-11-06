@@ -9,7 +9,7 @@ export const OUTER_KIND_OPTIONS: readonly Option<OuterSleeveKind>[] = [
   { value: 'pvc-clear', label: 'PVC transparente' },
   { value: 'pvc-tinted', label: 'PVC tintado' },
   { value: 'printed', label: 'Impresa' },
-  { value: 'resellable', label: 'Con cierre adhesivo' },
+  { value: 'resealable', label: 'Con cierre adhesivo' },
 ];
 
 export function buildFundaExteriorTab(ctx: EditorContext): Child[] {

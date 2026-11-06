@@ -1,0 +1,450 @@
+/*
+  Estantería de nogal con baldas, lomos a escala propia (`shelf-layout.ts`)
+  y cajas de madera en el suelo cuando las baldas se llenan. Las medidas
+  que comparten el CSS y el reparto llegan del TypeScript como variables
+  (`--est-fila-alto`, `--est-tabla`, `--est-relleno`…). Luz desde arriba a
+  la izquierda: cada lomo y cada balda proyectan su sombra hacia la derecha
+  y hacia abajo.
+*/
+
+.est {
+  --est-costado: 12px;
+  --est-veta: repeating-linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0) 0 9px,
+    rgba(0, 0, 0, 0.07) 9px 12px,
+    rgba(255, 236, 210, 0.03) 12px 21px,
+    rgba(0, 0, 0, 0.05) 21px 24px,
+    rgba(0, 0, 0, 0) 24px 37px
+  );
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-family: var(--fuente);
+  color: var(--texto-ui);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.est [hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ mueble */
+
+.est-mueble {
+  position: relative;
+  flex: none;
+  padding: var(--est-marco) var(--est-costado) 0;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, rgba(255, 236, 210, 0.1), rgba(255, 236, 210, 0) 8%), var(--est-veta),
+    linear-gradient(90deg, var(--nogal-claro), var(--nogal) 40%, var(--nogal-oscuro));
+  box-shadow:
+    10px 16px 30px rgba(0, 0, 0, 0.45),
+    2px 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Fondo del mueble: tablero trasero en sombra. */
+.est-baldas {
+  position: relative;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.22) 10%, rgba(0, 0, 0, 0.22) 88%, rgba(0, 0, 0, 0.55)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0) 14%), var(--est-veta), var(--nogal-oscuro);
+}
+
+.est-balda {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: var(--est-fila-alto);
+}
+
+.est-fila {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  height: calc(var(--est-fila-alto) - var(--est-tabla));
+  padding-inline: var(--est-relleno);
+}
+
+/* Tabla de la balda: cara superior iluminada (donde se apoyan los lomos) y canto delantero. */
+.est-tabla {
+  position: relative;
+  flex: none;
+  height: var(--est-tabla);
+  margin-top: -5px;
+  background: linear-gradient(
+      180deg,
+      var(--nogal-claro) 0 5px,
+      rgba(255, 236, 210, 0.16) 5px 6px,
+      var(--nogal) 6px 70%,
+      var(--nogal-oscuro)
+    ),
+    var(--est-veta);
+  box-shadow: 0 7px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* ------------------------------------------------------------ lomos */
+
+.est-lomo {
+  position: relative;
+  flex: none;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: var(--carbon);
+  box-shadow: 2px 0 3px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+  touch-action: pan-y;
+  transition:
+    transform var(--dur-rapida) var(--curva),
+    box-shadow var(--dur-rapida) var(--curva),
+    filter var(--dur-rapida) var(--curva);
+}
+
+.est-lomo-lienzo {
+  display: block;
+  max-width: none;
+  pointer-events: none;
+}
+
+.est-lomo:hover,
+.est-lomo:focus-visible {
+  z-index: 2;
+}
+
+.est-lomo:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .est-lomo:hover,
+  .est-lomo:focus-visible {
+    transform: translateY(-10px);
+    box-shadow: 3px 7px 9px rgba(0, 0, 0, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .est-lomo:hover,
+  .est-lomo:focus-visible {
+    filter: brightness(1.15);
+  }
+}
+
+/* Lomo del vinilo que se está editando. */
+.est-lomo.es-seleccionado {
+  box-shadow:
+    0 0 0 2px var(--acento),
+    2px 0 3px rgba(0, 0, 0, 0.38);
+}
+
+.est-arrastrando .est-lomo:not(.es-arrastrado) {
+  transform: none;
+  transition: none;
+}
+
+.est-lomo.es-arrastrado {
+  z-index: 5;
+  cursor: grabbing;
+  opacity: 0.92;
+  box-shadow: var(--sombra-objeto);
+  transition: none;
+}
+
+/* Hueco que deja el vinilo que está en el plato o en la mano. */
+.est-hueco {
+  position: relative;
+  flex: none;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.3) 45%, rgba(0, 0, 0, 0.42));
+  box-shadow:
+    inset 3px 0 5px rgba(0, 0, 0, 0.6),
+    inset -1px 0 2px rgba(0, 0, 0, 0.35);
+}
+
+/* ------------------------------------------------------------ añadir y estantería vacía */
+
+.est-anadir {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--est-anadir-ancho) - 6px);
+  height: var(--est-lomo-alto-12);
+  margin: 0 0 0 6px;
+  padding: 0;
+  border: 2px dashed rgba(201, 166, 107, 0.55);
+  border-radius: 2px;
+  background: rgba(201, 166, 107, 0.05);
+  color: var(--kraft);
+  transition:
+    border-color var(--dur-rapida) var(--curva),
+    background-color var(--dur-rapida) var(--curva),
+    color var(--dur-rapida) var(--curva);
+}
+
+.est-anadir:hover {
+  border-color: var(--kraft);
+  background: rgba(201, 166, 107, 0.12);
+  color: var(--kraft-claro);
+}
+
+.est-anadir-texto {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: var(--tamano-s);
+  font-weight: 650;
+  font-stretch: 80%;
+  white-space: nowrap;
+}
+
+/* Nota de papel apoyada en la balda cuando no hay vinilos. */
+.est-vacia {
+  flex: 0 1 260px;
+  align-self: center;
+  margin-right: var(--esp-4);
+  padding: var(--esp-3) var(--esp-4);
+  border-radius: 2px;
+  background: var(--kraft-claro);
+  color: var(--carbon);
+  font-size: var(--tamano-s);
+  line-height: 1.4;
+  box-shadow: 3px 5px 9px rgba(0, 0, 0, 0.42);
+  transform: rotate(-1.5deg);
+}
+
+/* ------------------------------------------------------------ cajas en el suelo */
+
+.est-suelo {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--esp-4);
+  height: var(--est-suelo-alto);
+  margin-top: auto;
+  padding: 0 var(--esp-2) var(--esp-1);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.est-caja {
+  position: relative;
+  flex: none;
+  width: 156px;
+  height: 126px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.est-caja:focus-visible {
+  outline-offset: 4px;
+}
+
+/* Cantos del resto de vinilos, asomando por detrás de la portada. */
+.est-caja-cantos {
+  position: absolute;
+  left: 22px;
+  bottom: 14px;
+  width: 112px;
+  height: 112px;
+}
+
+.est-caja-canto {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px 2px 0 0;
+  transform: translate(calc(var(--canto) * 1px), calc(var(--canto) * -4px));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.est-caja-portada {
+  position: absolute;
+  left: 22px;
+  bottom: 14px;
+  max-width: none;
+  box-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.3),
+    2px 0 4px rgba(0, 0, 0, 0.4);
+  transition: transform var(--dur-rapida) var(--curva);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .est-caja:hover .est-caja-portada,
+  .est-caja.es-abierta .est-caja-portada {
+    transform: translateY(-6px);
+  }
+}
+
+/* Frente de la caja: dos listones de madera con una asa troquelada. */
+.est-caja-frente {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 62px;
+  border-radius: 3px;
+  background: linear-gradient(
+      180deg,
+      rgba(255, 236, 210, 0.14) 0 2px,
+      rgba(0, 0, 0, 0) 2px 47%,
+      rgba(0, 0, 0, 0.55) 47% calc(47% + 3px),
+      rgba(255, 236, 210, 0.08) calc(47% + 3px) calc(47% + 5px),
+      rgba(0, 0, 0, 0) calc(47% + 5px) 100%
+    ),
+    var(--est-veta), linear-gradient(90deg, var(--nogal-claro), var(--nogal) 60%, var(--nogal-oscuro));
+  box-shadow: var(--sombra-objeto);
+}
+
+.est-caja.es-abierta .est-caja-frente {
+  box-shadow:
+    0 0 0 2px var(--kraft),
+    var(--sombra-objeto);
+}
+
+.est-caja-asa {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 44px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  background: rgba(20, 12, 6, 0.88);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.65);
+}
+
+.est-caja-cuenta {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  font-size: var(--tamano-xs);
+  font-weight: 700;
+  font-stretch: 75%;
+  font-variant-numeric: tabular-nums;
+  color: rgba(241, 230, 207, 0.72);
+}
+
+/* Lista desplegada de una caja: una bandeja de lomos para elegir. */
+.est-caja-lista {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--est-suelo-alto) + var(--esp-2));
+  padding: var(--esp-3) var(--esp-4) var(--esp-4);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-l);
+  background: var(--fondo-ui);
+  box-shadow: var(--sombra-objeto);
+}
+
+.est-caja-lista-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  margin-bottom: var(--esp-2);
+}
+
+.est-caja-lista-titulo {
+  font-size: var(--tamano-s);
+  font-weight: 700;
+}
+
+.est-caja-cerrar {
+  min-height: 32px;
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-m);
+  background: var(--fondo-ui-2);
+  color: var(--texto-ui);
+  font-size: var(--tamano-s);
+  font-weight: 600;
+}
+
+.est-caja-cerrar:hover {
+  border-color: rgba(201, 166, 107, 0.5);
+}
+
+.est-caja-fila {
+  display: flex;
+  align-items: flex-end;
+  height: calc(var(--est-lomo-alto-12) + var(--est-hueco-alto));
+  padding: 0 var(--esp-1);
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 6px solid var(--nogal);
+  scrollbar-width: thin;
+}
+
+.est-caja-fila .est-lomo {
+  touch-action: pan-x;
+}
+
+/* ------------------------------------------------------------ miniatura y marcador */
+
+.est-miniatura {
+  position: fixed;
+  z-index: 20;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: 2px;
+  background: var(--carbon);
+  box-shadow: var(--sombra-objeto);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  transition:
+    opacity var(--dur-rapida) var(--curva),
+    transform var(--dur-rapida) var(--curva),
+    visibility 0s linear var(--dur-rapida);
+}
+
+.est-miniatura.es-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+.est-miniatura-lienzo {
+  display: block;
+  max-width: none;
+}
+
+/* Dónde caerá el lomo que se arrastra. */
+.est-marcador {
+  position: fixed;
+  z-index: 21;
+  left: 0;
+  top: 0;
+  display: none;
+  width: 3px;
+  height: 0;
+  border-radius: 2px;
+  background: var(--foco);
+  box-shadow: 0 0 8px rgba(255, 209, 102, 0.7);
+  pointer-events: none;
+}
+
+.est-marcador.es-visible {
+  display: block;
+}
