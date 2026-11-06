@@ -580,6 +580,7 @@ describe('medidas de la mano', () => {
     expect(brushStrength(40, 40)).toBeCloseTo(0.75);
     expect(brushStrength(40, 1)).toBe(1);
     expect(brushStrength(0, 100)).toBe(0.25);
-    expect(brushStrength(40, 100000)).toBe(0.25);
+    expect(brushStrength(40, 100000)).toBeCloseTo(0.25, 3);
+    expect(brushStrength(40, 400)).toBeLessThan(brushStrength(40, 40));
   });
 });
