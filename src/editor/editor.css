@@ -1,0 +1,637 @@
+/*
+  Editor de vinilo: cajón de interfaz "de aplicación", carbón con texto
+  kraft. La habitación lo coloca (entra por la derecha); aquí solo se define
+  su interior: barra, vista previa, datos generales, pestañas y panel.
+*/
+
+.ed {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(34rem, 100vw);
+  height: 100%;
+  max-height: 100dvh;
+  background: var(--fondo-ui);
+  color: var(--texto-ui);
+  font-size: var(--tamano-m);
+  box-shadow: var(--sombra-objeto);
+}
+
+/* Las clases con `display` anularían el atributo `hidden`. */
+.ed [hidden] {
+  display: none !important;
+}
+
+/* --- Barra superior ------------------------------------------------------ */
+
+.ed-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3) var(--esp-4);
+  border-bottom: 1px solid var(--linea-ui);
+}
+
+.ed-bar__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.ed-bar__title {
+  font-size: var(--tamano-l);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 1.1;
+}
+
+.ed-bar__subtitle {
+  margin-top: 2px;
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+  font-stretch: 80%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ed-empty {
+  padding: var(--esp-5) var(--esp-4);
+  color: var(--texto-ui-suave);
+}
+
+/* --- Cuerpo: vista previa fija y zona con scroll --------------------------- */
+
+.ed-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ed-preview-host {
+  flex: none;
+  border-bottom: 1px solid var(--linea-ui);
+}
+
+.ed-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--esp-4) var(--esp-6);
+}
+
+/* --- Vista previa --------------------------------------------------------- */
+
+.ed-preview__summary {
+  padding: var(--esp-2) var(--esp-4);
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ed-preview__stage {
+  display: grid;
+  place-items: center;
+  min-height: 12rem;
+  padding: var(--esp-3) var(--esp-4);
+  /* Luz cálida desde arriba a la izquierda sobre fieltro. */
+  background:
+    radial-gradient(circle at 22% 12%, var(--carbon-claro), transparent 70%),
+    var(--fieltro);
+}
+
+.ed-preview__group {
+  display: grid;
+  place-items: center;
+}
+
+.ed-stack > canvas {
+  grid-area: 1 / 1;
+}
+
+.ed-preview__disc {
+  border-radius: 50%;
+  box-shadow: var(--sombra-objeto);
+}
+
+.ed-preview__jacket {
+  box-shadow: var(--sombra-objeto);
+}
+
+.ed-preview__layer {
+  pointer-events: none;
+}
+
+.ed-spines {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.ed-spine-sample,
+.ed-preview__spine {
+  width: 16px;
+  height: 180px;
+  box-shadow: var(--sombra-suave);
+}
+
+.ed-spine-sample {
+  background: linear-gradient(90deg, var(--aluminio-oscuro), var(--aluminio) 45%, var(--aluminio-oscuro));
+}
+
+.ed-spine-sample--baja {
+  height: 172px;
+}
+
+.ed-preview__controls {
+  display: flex;
+  justify-content: center;
+  padding: var(--esp-2) var(--esp-4) 0;
+}
+
+.ed-preview__caption {
+  padding: var(--esp-1) var(--esp-4) var(--esp-2);
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-xs);
+  text-align: center;
+}
+
+/* --- Conmutadores (Cara A / Cara B, Portada / Contraportada…) ------------- */
+
+.ed-toggle {
+  display: inline-flex;
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-s);
+  overflow: hidden;
+}
+
+.ed-toggle__btn {
+  min-height: 2rem;
+  padding: var(--esp-1) var(--esp-3);
+  border: 0;
+  background: transparent;
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+  transition: background-color var(--dur-rapida) var(--curva);
+}
+
+.ed-toggle__btn + .ed-toggle__btn {
+  border-left: 1px solid var(--linea-ui);
+}
+
+.ed-toggle__btn[aria-pressed='true'] {
+  background: var(--acento);
+  color: var(--acento-texto);
+}
+
+/* --- Pestañas ------------------------------------------------------------- */
+
+.ed-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1);
+  margin: 0 calc(-1 * var(--esp-4));
+  padding: var(--esp-2) var(--esp-4);
+  background: var(--fondo-ui);
+  border-bottom: 1px solid var(--linea-ui);
+}
+
+.ed-tab {
+  min-height: 2rem;
+  padding: var(--esp-1) var(--esp-2);
+  border: 0;
+  border-radius: var(--radio-s);
+  background: transparent;
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+  transition:
+    background-color var(--dur-rapida) var(--curva),
+    color var(--dur-rapida) var(--curva);
+}
+
+.ed-tab:hover {
+  background: var(--fondo-ui-2);
+  color: var(--texto-ui);
+}
+
+.ed-tab[aria-selected='true'] {
+  background: var(--acento);
+  color: var(--acento-texto);
+  font-weight: 700;
+}
+
+.ed-panel {
+  padding-top: var(--esp-2);
+}
+
+.ed-panel:focus-visible {
+  outline-offset: -2px;
+}
+
+/* --- Grupos y disposición -------------------------------------------------- */
+
+.ed-set {
+  display: grid;
+  gap: var(--esp-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--esp-4) 0;
+  border: 0;
+  border-top: 1px solid var(--linea-ui);
+}
+
+.ed-panel > .ed-set:first-child,
+.ed-panel > .ed-row:first-child + .ed-set,
+.ed-general-box > .ed-set:first-child {
+  border-top: 0;
+}
+
+.ed-legend {
+  padding: 0;
+  margin-bottom: var(--esp-2);
+  font-weight: 750;
+  font-size: var(--tamano-m);
+  color: var(--texto-ui);
+}
+
+.ed-set .ed-set {
+  padding: var(--esp-2) 0 0;
+}
+
+.ed-set .ed-set > .ed-legend {
+  font-size: var(--tamano-s);
+  font-weight: 650;
+}
+
+.ed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--esp-3);
+}
+
+.ed-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.ed-panel > .ed-row:first-child {
+  padding: var(--esp-2) 0;
+}
+
+.ed-subgroup {
+  display: grid;
+  gap: var(--esp-2);
+}
+
+.ed-sublegend {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+  font-weight: 650;
+}
+
+.ed-note {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+}
+
+.ed-note--aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  border-left: 3px solid var(--foco);
+  background: var(--fondo-ui-2);
+  color: var(--texto-ui);
+}
+
+/* --- Campos ---------------------------------------------------------------- */
+
+.ed-field {
+  display: grid;
+  gap: var(--esp-1);
+  min-width: 0;
+}
+
+.ed-field__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--esp-2);
+}
+
+.ed-label {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+}
+
+.ed-hint {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-xs);
+}
+
+.ed-input {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: var(--esp-1) var(--esp-2);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-s);
+  background: var(--fondo-ui-2);
+  color: var(--texto-ui);
+}
+
+.ed-input:hover {
+  border-color: var(--kraft-oscuro);
+}
+
+.ed-input[aria-invalid='true'] {
+  border-color: var(--rojo-emi);
+}
+
+.ed-input[readonly] {
+  background: transparent;
+  color: var(--texto-ui-suave);
+}
+
+.ed-textarea {
+  resize: vertical;
+  line-height: var(--interlineado);
+}
+
+.ed-input--number,
+.ed-input--duration {
+  font-variant-numeric: tabular-nums;
+}
+
+.ed-select {
+  cursor: pointer;
+}
+
+.ed-range {
+  width: 100%;
+  accent-color: var(--acento);
+}
+
+.ed-readout-inline {
+  color: var(--texto-ui);
+  font-size: var(--tamano-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.ed-color {
+  width: 3.25rem;
+  height: 2.25rem;
+  padding: 2px;
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-s);
+  background: var(--fondo-ui-2);
+  cursor: pointer;
+}
+
+.ed-radios {
+  display: grid;
+  gap: var(--esp-2);
+}
+
+.ed-check {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  min-height: 2rem;
+  cursor: pointer;
+}
+
+.ed-checkbox,
+.ed-radio {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--acento);
+}
+
+.ed-readout {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--esp-3);
+  padding: var(--esp-1) 0;
+}
+
+.ed-readout__label {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+}
+
+.ed-readout__value {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* --- Botones ---------------------------------------------------------------- */
+
+.ed-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: var(--esp-1) var(--esp-3);
+  border: 1px solid var(--linea-ui);
+  border-radius: var(--radio-s);
+  background: transparent;
+  color: var(--texto-ui);
+  font-size: var(--tamano-s);
+  transition:
+    background-color var(--dur-rapida) var(--curva),
+    border-color var(--dur-rapida) var(--curva);
+}
+
+.ed-btn:hover:not(:disabled) {
+  background: var(--fondo-ui-2);
+  border-color: var(--kraft-oscuro);
+}
+
+.ed-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ed-btn--small {
+  min-height: 2rem;
+  padding: 2px var(--esp-2);
+  font-size: var(--tamano-xs);
+}
+
+.ed-btn--cerrar {
+  flex: none;
+}
+
+.ed-btn--peligro {
+  border-color: var(--rojo-emi);
+  color: var(--acento-texto);
+}
+
+.ed-btn--peligro:hover:not(:disabled) {
+  background: var(--rojo-emi-oscuro);
+  border-color: var(--rojo-emi);
+}
+
+.ed-general-box > .ed-row:last-child {
+  padding-bottom: var(--esp-4);
+}
+
+/* Selector de archivo: una <label> con aspecto de botón y el input oculto dentro. */
+.ed-file {
+  position: relative;
+  cursor: pointer;
+}
+
+.ed-file:focus-within {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+.ed-file:has(input:disabled) {
+  opacity: 0.45;
+  cursor: progress;
+}
+
+/* --- Imágenes, rellenos y estilos ------------------------------------------- */
+
+.ed-image {
+  display: grid;
+  gap: var(--esp-2);
+}
+
+.ed-image__name {
+  font-size: var(--tamano-s);
+  overflow-wrap: anywhere;
+}
+
+.ed-status {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+}
+
+.ed-status--ocupado {
+  color: var(--texto-ui);
+}
+
+.ed-fill__body {
+  display: grid;
+  gap: var(--esp-3);
+}
+
+/* --- Líneas extra de la galleta --------------------------------------------- */
+
+.ed-lines {
+  display: grid;
+  gap: var(--esp-2);
+}
+
+.ed-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--esp-2);
+}
+
+/* --- Canciones -------------------------------------------------------------- */
+
+.ed-tracks {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.ed-track {
+  display: grid;
+  gap: var(--esp-2);
+  padding: var(--esp-3) 0;
+  border-top: 1px solid var(--linea-ui);
+}
+
+.ed-track:first-child {
+  border-top: 0;
+}
+
+.ed-track__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  gap: var(--esp-2);
+  font-stretch: 85%;
+}
+
+.ed-track__file {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-xs);
+  font-stretch: 80%;
+  overflow-wrap: anywhere;
+}
+
+.ed-drop {
+  display: grid;
+  gap: var(--esp-3);
+  margin-top: var(--esp-3);
+  padding: var(--esp-4);
+  border: 1px dashed var(--linea-ui);
+  border-radius: var(--radio-m);
+  transition:
+    border-color var(--dur-rapida) var(--curva),
+    background-color var(--dur-rapida) var(--curva);
+}
+
+.ed-drop--activa {
+  border-color: var(--foco);
+  background: var(--fondo-ui-2);
+}
+
+.ed-drop__hint {
+  color: var(--texto-ui-suave);
+  font-size: var(--tamano-s);
+}
+
+.ed-import__status {
+  display: grid;
+  gap: var(--esp-1);
+}
+
+.ed-rejected {
+  margin: 0;
+  padding-left: var(--esp-4);
+  font-size: var(--tamano-s);
+}
+
+/* --- Pantallas estrechas o bajas --------------------------------------------- */
+
+@media (max-width: 480px) {
+  .ed-bar {
+    padding: var(--esp-2) var(--esp-3);
+  }
+
+  .ed-scroll {
+    padding: 0 var(--esp-3) var(--esp-5);
+  }
+
+  .ed-tabs {
+    margin: 0 calc(-1 * var(--esp-3));
+    padding: var(--esp-2) var(--esp-3);
+  }
+}
+
+@media (max-height: 640px) {
+  /* Con poca altura la vista previa se cierra a mano desde su resumen; el lienzo no crece. */
+  .ed-preview__stage {
+    min-height: 0;
+    padding: var(--esp-2);
+  }
+}
