@@ -22,6 +22,17 @@ npm run dev
 
 Abre la dirección que imprime Vite (normalmente `http://localhost:5173`).
 
+### En Windows, con doble clic
+
+Después de la primera vez no hace falta escribir nada: haz doble clic en
+`Tocadiscos.bat`, dentro de la carpeta del proyecto. Arranca el servidor y
+abre el navegador solo. Deja abierta la ventana negra mientras lo usas y
+ciérrala para apagarlo. Para tenerlo a mano, clic derecho sobre el archivo,
+"Enviar a", "Escritorio (crear acceso directo)".
+
+Usa siempre la dirección `http://localhost:5173`: la colección de vinilos se
+guarda en el navegador ligada a esa dirección exacta.
+
 Para generar una versión estática lista para servir desde cualquier carpeta:
 
 ```bash
