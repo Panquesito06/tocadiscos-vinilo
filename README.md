@@ -47,8 +47,28 @@ npm run preview
 - En el editor hay una pestaña por cada parte del vinilo. Todo lo que cambies
   se ve al instante en la vista previa.
 
-Atajos: espacio arranca y para el motor; ← y → mueven el brazo; ↑ y ↓
-levantan y bajan la aguja; Esc cierra lo que esté abierto.
+- El disco se comporta como un objeto físico: fuera de su funda coge polvo
+  (más con la tapa abierta) y crepita; cada reproducción lo desgasta un
+  poco; un disco fino y alabeado bambolea; un single de agujero grande sin
+  centrador gira descentrado; y a otra velocidad cambia el tono. En
+  "Ajustes" puedes acelerar la acumulación de polvo para notarlo antes.
+
+Atajos de teclado:
+
+- Espacio arranca y para el motor (cuando el foco no está en un control).
+- Con el brazo enfocado (tecla Tab hasta él): ← y → lo mueven 2 mm, Av Pág
+  y Re Pág 10 mm, ↑ y ↓ levantan y bajan la aguja. Desde el soporte, ←
+  lleva el cabezal al principio del disco.
+- En la estantería: Enter saca el vinilo, E abre el editor, ← y → cambian
+  de lomo y Alt + ← / → lo reordenan.
+- Esc cierra lo que esté abierto.
+
+Notas:
+
+- El sonido necesita `https` o `localhost` (el navegador no permite el
+  motor de audio en otras direcciones `http`).
+- La colección vive en este navegador. Si borras los datos del sitio, se
+  pierde: todavía no hay exportación a archivo.
 
 ## Desarrollo
 
